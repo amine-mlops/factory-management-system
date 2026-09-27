@@ -57,16 +57,23 @@ agent.py Orchestrator (intent routing, multi-hop synthesis)
 
 ## 4. Directory Layout & Team Ownership
 
+| Owner (Discord) | Scope |
+|---|---|
+| **a56lp28sh58ck** | Data engineering: `demo/seed.py` (golden dataset), `backend/sql_engine.py` (DuckDB, PRAGMA recon, Text-to-SQL), synthetic data |
+| **khalid_is_somewhere** | Frontend: React 18+ SPA (Vite + Tailwind) |
+| **drifter_0** | `backend/rag_engine.py`: PDF ingest, chunking, role-scoped metadata filters |
+| **amineelbaydaouy** + **the_one_and_only_otter** | Agentic capabilities: `backend/agent.py` orchestrator, intent→rule compiler (`demo/rules.json`), `/api/audit/run` evaluator, cronjob monitoring, multi-hop root-cause reasoning |
+
 ```
 ├── backend/
-│   ├── main.py            # [Person 1] FastAPI entry, CORS, /chat & /audit routes
-│   ├── schemas.py         # [Person 1] Pydantic request/response models
-│   ├── permissions.py     # [Person 1] RBAC rules & role-based filter conditions
-│   ├── sql_engine.py      # [Person 3] DuckDB client, PRAGMA recon, SQL generator
-│   ├── rag_engine.py      # [Person 4] Vector store, PDF chunking, metadata filters
-│   └── agent.py           # [Person 5] Central agent, tool routing, causal reasoning
+│   ├── main.py            # FastAPI entry, CORS, /chat & /audit routes  [amineelbaydaouy + the_one_and_only_otter]
+│   ├── schemas.py         # Pydantic request/response models  [same]
+│   ├── permissions.py     # RBAC rules & role-based filters  [UNOWNED — assign!]
+│   ├── sql_engine.py      # DuckDB client, PRAGMA recon, SQL generator  [a56lp28sh58ck]
+│   ├── rag_engine.py      # Vector store, PDF chunking, metadata filters  [drifter_0]
+│   └── agent.py           # Central agent, tool routing, causal reasoning  [amineelbaydaouy + the_one_and_only_otter]
 │
-├── frontend/              # [Person 2] React 18+ SPA (Vite + Tailwind CSS)
+├── frontend/              # React 18+ SPA (Vite + Tailwind CSS)  [khalid_is_somewhere]
 │   ├── vite.config.js     # Proxy → http://localhost:8000
 │   └── src/
 │       ├── App.jsx        # App shell, persona state, dashboard layout
@@ -77,17 +84,15 @@ agent.py Orchestrator (intent routing, multi-hop synthesis)
 │           └── Audit.jsx  # Active rules table & "Run Operational Audit" button
 │
 ├── demo/
-│   ├── seed.py            # [Person 5] Initializes DuckDB tables & records
-│   ├── rules.json         # [Person 1] Intent-compiled audit rules
-│   └── docs/              # [Person 4] Operational incident PDFs
+│   ├── seed.py            # DuckDB tables & records  [a56lp28sh58ck]
+│   ├── rules.json         # Intent-compiled audit rules  [amineelbaydaouy + the_one_and_only_otter]
+│   └── docs/              # Operational incident PDFs  [drifter_0]
 │       ├── carrier_sop.pdf
 │       └── workshop_log.pdf
 │
 ├── requirements.txt
 └── README.md
 ```
-
-**Person → Discord handle mapping:** TODO (PM to fill in — tell the bot who is Person 1–5).
 
 ## 5. RBAC Clearances (backend/permissions.py)
 
@@ -150,9 +155,9 @@ Response:
 
 ## 8. Delivery Sequence
 
-**[Hour 0–1] Seed & Gateway Init** — P5: seed.py → supply_chain.duckdb · P1: scaffold FastAPI/CORS/schemas/permissions · P2: scaffold React+Vite + proxy
+**[Hour 0–1] Seed & Gateway Init** — a56lp28sh58ck: seed.py → supply_chain.duckdb · amineelbaydaouy+the_one_and_only_otter: scaffold FastAPI/CORS/schemas/permissions · khalid_is_somewhere: scaffold React+Vite + proxy
 
-**[Hour 1–3] Subsystems** — P1: /chat & /audit/run + rules.json · P2: persona dropdown, chat feed, diagnostic drawer, alert bar · P3: PRAGMA recon + Text-to-SQL · P4: PDF ingest + role-scoped filters · P5: agent.py dual-hop fusion
+**[Hour 1–3] Subsystems** — amineelbaydaouy+the_one_and_only_otter: /chat & /audit/run + rules.json · khalid_is_somewhere: persona dropdown, chat feed, diagnostic drawer, alert bar · a56lp28sh58ck: PRAGMA recon + Text-to-SQL · drifter_0: PDF ingest + role-scoped filters · amineelbaydaouy+the_one_and_only_otter: agent.py dual-hop fusion
 
 **[Hour 3–4] Integration** — wire api.js → /api; verify golden path (rule → audit alert → root-cause verdict); verify security (driver persona → financial denial)
 
