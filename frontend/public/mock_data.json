@@ -1,0 +1,785 @@
+{
+  "telemetry": {
+    "request_id": "req_7f3a9c21-p204",
+    "timestamp": "2026-09-27T14:32:08.412Z",
+    "latency_ms": 38,
+    "device": "NVIDIA A100-SXM4-80GB · Brev",
+    "gpu_utilization": 63,
+    "memory_used_gb": 23.4,
+    "memory_total_gb": 80,
+    "status": "operational"
+  },
+  "input": {
+    "source": "opcua://plant-a/cooling-loop-2/P-204",
+    "preset": "Pump Cavitation",
+    "frame_id": 30452
+  },
+  "asset": {
+    "id": "P-204",
+    "name": "Cooling Water Pump P-204",
+    "type": "pump",
+    "model": "Centrifugal · end-suction · 250 kW",
+    "location": "Plant A · Cooling Loop 2",
+    "rated_rpm": 1480,
+    "shaft_hz": 24.7,
+    "health_score": 48,
+    "remaining_useful_life_hours": 96
+  },
+  "signals": [
+    {
+      "key": "vibration",
+      "label": "Vibration velocity",
+      "unit": "mm/s RMS",
+      "values": [
+        2.04,
+        2.08,
+        2.06,
+        1.89,
+        1.98,
+        1.96,
+        1.9,
+        2.1,
+        2.07,
+        2.04,
+        1.96,
+        2.06,
+        2.02,
+        1.98,
+        2.05,
+        1.89,
+        2.05,
+        2.06,
+        2.08,
+        1.95,
+        2.09,
+        2.08,
+        2.07,
+        2.07,
+        2.11,
+        2.04,
+        2.03,
+        1.89,
+        1.92,
+        1.92,
+        2.05,
+        1.95,
+        1.95,
+        2.07,
+        2.11,
+        2.27,
+        2.32,
+        2.44,
+        2.59,
+        2.52,
+        2.68,
+        2.83,
+        2.84,
+        3.43,
+        3.12,
+        3.55,
+        3.48,
+        3.96,
+        4.52,
+        4.81,
+        4.73,
+        5.08,
+        4.99,
+        5,
+        4.89,
+        5.97,
+        5.85,
+        6.28,
+        6.22,
+        5.62,
+        6.39,
+        5.93,
+        6.58,
+        6.1
+      ],
+      "sample_rate_hz": 25600,
+      "warn": 2.8,
+      "alarm": 4.5,
+      "limit": "upper"
+    },
+    {
+      "key": "pressure",
+      "label": "Discharge pressure",
+      "unit": "bar",
+      "values": [
+        7.39,
+        7.44,
+        7.37,
+        7.44,
+        7.41,
+        7.4,
+        7.34,
+        7.41,
+        7.43,
+        7.44,
+        7.37,
+        7.35,
+        7.37,
+        7.42,
+        7.4,
+        7.38,
+        7.37,
+        7.37,
+        7.42,
+        7.41,
+        7.38,
+        7.4,
+        7.36,
+        7.45,
+        7.44,
+        7.37,
+        7.37,
+        7.4,
+        7.46,
+        7.43,
+        7.44,
+        7.35,
+        7.39,
+        7.45,
+        7.44,
+        7.4,
+        7.4,
+        7.35,
+        7.23,
+        7.23,
+        7.24,
+        7.19,
+        7.07,
+        6.97,
+        6.96,
+        7.14,
+        7.07,
+        6.8,
+        6.51,
+        6.57,
+        6.84,
+        6.92,
+        6.64,
+        6.16,
+        6.06,
+        6.35,
+        6.75,
+        6.65,
+        6.03,
+        5.69,
+        5.91,
+        6.46,
+        6.74,
+        6.12
+      ],
+      "sample_rate_hz": 25600,
+      "warn": 6.5,
+      "alarm": 5.8,
+      "limit": "lower"
+    },
+    {
+      "key": "bearing_temp",
+      "label": "Bearing temperature",
+      "unit": "°C",
+      "values": [
+        64.02,
+        64.1,
+        64.05,
+        63.81,
+        63.98,
+        64.13,
+        63.91,
+        64.04,
+        64.12,
+        64.19,
+        63.93,
+        64.12,
+        63.89,
+        64.13,
+        64.14,
+        64.05,
+        64.03,
+        63.85,
+        63.83,
+        63.91,
+        64.14,
+        63.89,
+        64.09,
+        64.03,
+        64.02,
+        64.05,
+        64.14,
+        64.12,
+        64.08,
+        64.27,
+        64.46,
+        64.52,
+        64.54,
+        64.93,
+        65.1,
+        65.19,
+        65.42,
+        65.47,
+        65.83,
+        66.01,
+        66.39,
+        66.78,
+        66.78,
+        67.36,
+        67.63,
+        67.91,
+        68.07,
+        68.45,
+        68.52,
+        68.74,
+        68.92,
+        69.28,
+        69.4,
+        69.84,
+        70,
+        70.1,
+        70.34,
+        70.64,
+        70.76,
+        70.93,
+        70.97,
+        71.05,
+        71.12,
+        71
+      ],
+      "sample_rate_hz": 25600,
+      "warn": 82,
+      "alarm": 90,
+      "limit": "upper"
+    },
+    {
+      "key": "torque",
+      "label": "Motor torque",
+      "unit": "%",
+      "values": [
+        78.13,
+        78.39,
+        77.54,
+        77.85,
+        77.56,
+        78.32,
+        77.94,
+        78.3,
+        77.65,
+        77.77,
+        78.58,
+        77.75,
+        77.42,
+        77.57,
+        77.42,
+        78.01,
+        78.52,
+        77.91,
+        77.68,
+        77.63,
+        77.68,
+        77.54,
+        78.52,
+        77.42,
+        78,
+        78.09,
+        77.7,
+        77.95,
+        77.84,
+        78.23,
+        78.57,
+        78.52,
+        77.86,
+        78.55,
+        78.09,
+        77.98,
+        78.34,
+        78.43,
+        77.78,
+        78.14,
+        78.2,
+        77.88,
+        79.71,
+        79,
+        79.05,
+        76.2,
+        76.12,
+        77.22,
+        78.11,
+        80.6,
+        81.54,
+        78.3,
+        73.01,
+        73.51,
+        73.41,
+        81.62,
+        83.39,
+        81.01,
+        76.72,
+        71.43,
+        70.33,
+        73.36,
+        83.72,
+        87.61
+      ],
+      "sample_rate_hz": 25600,
+      "warn": 90,
+      "alarm": 100,
+      "limit": "upper"
+    }
+  ],
+  "spectrum": [
+    {
+      "order": 0.5,
+      "amplitude": 0.09
+    },
+    {
+      "order": 0.75,
+      "amplitude": 0.13
+    },
+    {
+      "order": 1,
+      "amplitude": 1.05
+    },
+    {
+      "order": 1.25,
+      "amplitude": 0.18
+    },
+    {
+      "order": 1.5,
+      "amplitude": 0.16
+    },
+    {
+      "order": 1.75,
+      "amplitude": 0.16
+    },
+    {
+      "order": 2,
+      "amplitude": 0.42
+    },
+    {
+      "order": 2.25,
+      "amplitude": 0.23
+    },
+    {
+      "order": 2.5,
+      "amplitude": 0.25
+    },
+    {
+      "order": 2.75,
+      "amplitude": 0.2
+    },
+    {
+      "order": 3,
+      "amplitude": 0.26
+    },
+    {
+      "order": 3.25,
+      "amplitude": 0.3
+    },
+    {
+      "order": 3.5,
+      "amplitude": 0.28
+    },
+    {
+      "order": 3.75,
+      "amplitude": 0.23
+    },
+    {
+      "order": 4,
+      "amplitude": 0.3
+    },
+    {
+      "order": 4.25,
+      "amplitude": 0.28
+    },
+    {
+      "order": 4.5,
+      "amplitude": 0.36
+    },
+    {
+      "order": 4.75,
+      "amplitude": 0.33
+    },
+    {
+      "order": 5,
+      "amplitude": 1.5
+    },
+    {
+      "order": 5.25,
+      "amplitude": 0.41
+    },
+    {
+      "order": 5.5,
+      "amplitude": 0.31
+    },
+    {
+      "order": 5.75,
+      "amplitude": 0.36
+    },
+    {
+      "order": 6,
+      "amplitude": 0.49
+    },
+    {
+      "order": 6.25,
+      "amplitude": 0.42
+    },
+    {
+      "order": 6.5,
+      "amplitude": 0.51
+    },
+    {
+      "order": 6.75,
+      "amplitude": 0.39
+    },
+    {
+      "order": 7,
+      "amplitude": 0.5
+    },
+    {
+      "order": 7.25,
+      "amplitude": 0.43
+    },
+    {
+      "order": 7.5,
+      "amplitude": 0.59
+    },
+    {
+      "order": 7.75,
+      "amplitude": 0.45
+    },
+    {
+      "order": 8,
+      "amplitude": 0.44
+    },
+    {
+      "order": 8.25,
+      "amplitude": 0.46
+    },
+    {
+      "order": 8.5,
+      "amplitude": 0.65
+    },
+    {
+      "order": 8.75,
+      "amplitude": 0.46
+    },
+    {
+      "order": 9,
+      "amplitude": 0.49
+    },
+    {
+      "order": 9.25,
+      "amplitude": 0.59
+    },
+    {
+      "order": 9.5,
+      "amplitude": 0.62
+    },
+    {
+      "order": 9.75,
+      "amplitude": 0.64
+    },
+    {
+      "order": 10,
+      "amplitude": 1.11
+    }
+  ],
+  "detections": [
+    {
+      "id": "det-01",
+      "label": "Cavitation broadband signature",
+      "confidence": 0.984,
+      "severity": "critical",
+      "signal": "vibration",
+      "window": [
+        33,
+        63
+      ],
+      "evidence": "Broadband HF energy 2–8 kHz up 11.4 dB; vane-pass (5×) with non-periodic sidebands"
+    },
+    {
+      "id": "det-02",
+      "label": "Discharge pressure instability",
+      "confidence": 0.971,
+      "severity": "critical",
+      "signal": "pressure",
+      "window": [
+        35,
+        63
+      ],
+      "evidence": "Pressure oscillation ±0.6 bar at 1.8 Hz; mean below 6.5 bar warning"
+    },
+    {
+      "id": "det-03",
+      "label": "Hydraulic torque fluctuation",
+      "confidence": 0.948,
+      "severity": "medium",
+      "signal": "torque",
+      "window": [
+        38,
+        63
+      ],
+      "evidence": "±7.5% torque swing synchronous with pressure collapse events"
+    }
+  ],
+  "diagnosis": {
+    "fault": "Suction cavitation",
+    "component": "Impeller inlet · suction eye",
+    "failure_mode": "Vapour-bubble collapse → impeller erosion & seal damage",
+    "confidence": 0.984,
+    "evidence": [
+      "Broadband high-frequency energy (2–8 kHz) up 11.4 dB vs baseline",
+      "Vane-pass harmonic at 5× shaft frequency with non-periodic sidebands",
+      "NPSH margin ratio 0.93 — below the 1.10 minimum; discharge oscillating ±0.6 bar"
+    ],
+    "anomaly_score": [
+      0.19,
+      0.19,
+      0.15,
+      0.14,
+      0.18,
+      0.18,
+      0.17,
+      0.19,
+      0.18,
+      0.14,
+      0.16,
+      0.15,
+      0.14,
+      0.19,
+      0.13,
+      0.18,
+      0.19,
+      0.18,
+      0.15,
+      0.19,
+      0.19,
+      0.14,
+      0.15,
+      0.14,
+      0.14,
+      0.18,
+      0.14,
+      0.13,
+      0.16,
+      0.13,
+      0.14,
+      0.18,
+      0.16,
+      0.18,
+      0.2,
+      0.21,
+      0.27,
+      0.25,
+      0.27,
+      0.35,
+      0.34,
+      0.4,
+      0.44,
+      0.43,
+      0.51,
+      0.54,
+      0.57,
+      0.61,
+      0.62,
+      0.67,
+      0.69,
+      0.76,
+      0.75,
+      0.81,
+      0.84,
+      0.83,
+      0.89,
+      0.91,
+      0.92,
+      0.93,
+      0.96,
+      0.95,
+      0.98,
+      0.94
+    ],
+    "threshold": 0.7
+  },
+  "summary": {
+    "total_detections": 3,
+    "critical_count": 2,
+    "overall_confidence": 0.984
+  },
+  "standards_validation": {
+    "engine": "Deterministic physics & standards gate v2.4",
+    "verdict": "INTERVENTION_AUTHORIZED",
+    "independently_validated": true,
+    "rationale": "Two condition limits violated; every proposed setpoint verified inside the pump and process envelope before dispatch.",
+    "checks": [
+      {
+        "id": "chk-1",
+        "standard": "ISO 10816-3",
+        "parameter": "Vibration velocity RMS (zone C/D)",
+        "measured": 6.1,
+        "allowed_min": null,
+        "allowed_max": 4.5,
+        "unit": "mm/s",
+        "result": "VIOLATION",
+        "scope": "condition"
+      },
+      {
+        "id": "chk-2",
+        "standard": "ANSI/HI 9.6.1",
+        "parameter": "NPSH margin ratio (NPSHa / NPSHr)",
+        "measured": 0.93,
+        "allowed_min": 1.1,
+        "allowed_max": null,
+        "unit": "×",
+        "result": "VIOLATION",
+        "scope": "condition"
+      },
+      {
+        "id": "chk-3",
+        "standard": "OEM limit",
+        "parameter": "Bearing temperature",
+        "measured": 71,
+        "allowed_min": null,
+        "allowed_max": 82,
+        "unit": "°C",
+        "result": "PASS",
+        "scope": "condition"
+      },
+      {
+        "id": "chk-4",
+        "standard": "Motor / VFD spec",
+        "parameter": "Speed setpoint",
+        "measured": 1258,
+        "allowed_min": 1036,
+        "allowed_max": 1480,
+        "unit": "rpm",
+        "result": "PASS",
+        "scope": "command_envelope"
+      },
+      {
+        "id": "chk-5",
+        "standard": "API 610",
+        "parameter": "Minimum continuous stable flow",
+        "measured": 212,
+        "allowed_min": 140,
+        "allowed_max": null,
+        "unit": "m³/h",
+        "result": "PASS",
+        "scope": "command_envelope"
+      },
+      {
+        "id": "chk-6",
+        "standard": "Process spec",
+        "parameter": "Loop 2 header pressure after action",
+        "measured": 6.4,
+        "allowed_min": 6,
+        "allowed_max": null,
+        "unit": "bar",
+        "result": "PASS",
+        "scope": "command_envelope"
+      }
+    ]
+  },
+  "mitigation_command": {
+    "command_id": "CMD-P204-0927-0418",
+    "target": "PLC-7 · Cooling Water Loop 2",
+    "protocol": "OPC UA · IEC 62443 zone 2",
+    "mode": "simulated",
+    "status": "acknowledged",
+    "ack_ms": 184,
+    "intent": "Restore NPSH margin and suppress cavitation while Loop 2 keeps producing",
+    "operations": [
+      {
+        "tag": "P204.VFD.SPEED_SP",
+        "description": "Reduce motor speed 15%",
+        "from": 1480,
+        "to": 1258,
+        "unit": "rpm"
+      },
+      {
+        "tag": "XV204.POS_SP",
+        "description": "Open relief / recirculation valve",
+        "from": 0,
+        "to": 12,
+        "unit": "%"
+      },
+      {
+        "tag": "TK201.LEVEL_SP",
+        "description": "Raise suction tank level",
+        "from": 3.2,
+        "to": 3.5,
+        "unit": "m"
+      }
+    ]
+  },
+  "maintenance_ticket": {
+    "ticket_id": "WO-48219",
+    "system": "CMMS (simulated)",
+    "severity": "critical",
+    "title": "Inspect P-204 impeller for cavitation erosion",
+    "component": "Impeller · suction eye / mechanical seal",
+    "replacement_sku": "IMP-204-316SS-RC",
+    "remaining_safe_hours": 96,
+    "inspection_window": "Next 48 h · Tue 22:00–02:00 low-demand window",
+    "assigned_to": "Pump & Seal Team · Crew A",
+    "notes": "Check suction strainer ΔP and seal faces; confirm NPSHa after tank level change."
+  },
+  "impact": {
+    "avoided_downtime_hours": 11.5,
+    "avoided_cost_usd": 286000,
+    "throughput_maintained_pct": 85,
+    "traditional_outcome": "Low-pressure alarm → P-204 trips · Cooling Loop 2 offline 11.5 h",
+    "nexus_outcome": "Speed −15%, recirculation +12% · cavitation suppressed, Loop 2 at 85% throughput"
+  },
+  "actions": [
+    {
+      "step": 1,
+      "agent": "Telemetry Ingest",
+      "action": "Aligned 4 channels · 25.6 kHz capture + 64-min trend from OPC UA historian",
+      "status": "complete",
+      "duration_ms": 4
+    },
+    {
+      "step": 2,
+      "agent": "Neural Anomaly Engine",
+      "action": "Scored window with temporal transformer (FP16 · TensorRT) · score 0.95",
+      "status": "complete",
+      "duration_ms": 21
+    },
+    {
+      "step": 3,
+      "agent": "Diagnosis Agent",
+      "action": "Broadband HF + 5× vane-pass → suction cavitation · 98.4% confidence",
+      "status": "complete",
+      "duration_ms": 7
+    },
+    {
+      "step": 4,
+      "agent": "Physics & Standards Gate",
+      "action": "ISO 10816-3 + NPSH violations confirmed · envelope 3/3 PASS",
+      "status": "complete",
+      "duration_ms": 3
+    },
+    {
+      "step": 5,
+      "agent": "Action Generator",
+      "action": "Composed speed / valve / level write set within validated envelope",
+      "status": "complete",
+      "duration_ms": 3
+    },
+    {
+      "step": 6,
+      "agent": "SCADA Bridge",
+      "action": "Dispatched CMD-P204-0927-0418 · acknowledged (simulated)",
+      "status": "complete",
+      "duration_ms": 184
+    },
+    {
+      "step": 7,
+      "agent": "CMMS Agent",
+      "action": "Created work order WO-48219 · impeller kit reserved",
+      "status": "complete",
+      "duration_ms": 88
+    }
+  ]
+}
