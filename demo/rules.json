@@ -1,0 +1,12 @@
+[
+  {
+    "rule_id": "RULE-COLD-01",
+    "label": "dairy batches in transit: current_temp > 4°C",
+    "category": "dairy",
+    "metric": "current_temp",
+    "comparator": ">",
+    "threshold": 4.0,
+    "duration_hours": 0.0,
+    "severity": "high"
+  }
+]
