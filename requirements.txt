@@ -10,5 +10,4 @@ chromadb>=0.4.0
 pypdf>=3.10.0
 pydantic>=2.0.0
 python-dotenv>=1.0.0
-# Replace hermes-agent>=0.21.0 with:
-hermes-agent>=0.18.0
+
