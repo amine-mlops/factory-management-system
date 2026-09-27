@@ -1,10 +1,10 @@
 import { BookOpen, Layers, MessagesSquare } from 'lucide-react'
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { AssistantPanel } from '../components/assistant/AssistantPanel.tsx'
 import { Page, PageHeader } from '../components/ui/PageHeader.tsx'
 import { Badge, KpiCard, Panel } from '../components/ui/primitives.tsx'
 import { TabPanel, Tabs, type TabDef } from '../components/ui/Tabs.tsx'
-import { DocumentTable, IngestionStatus, RagIndicator, UploadZone } from '../components/workspace/DocumentsPanel.tsx'
+import { DocumentTable, IngestionStatus, RagIndicator, UploadZone, type DocActions } from '../components/workspace/DocumentsPanel.tsx'
 import { can, isOwnerLike } from '../lib/access.ts'
 import { useTab } from '../lib/route.ts'
 import { ragState, type KbDocument } from '../lib/workspace.ts'
@@ -17,13 +17,27 @@ type KbTab = 'documents' | 'ingestion' | 'ask'
  * architects (configure) manage the library; readers see only what their ACL allows.
  */
 export function KnowledgeView() {
-  const { ws, perms, update } = useWorkspace()
+  const { ws, perms, update, live, commit } = useWorkspace()
   const setDocs = useCallback((fn: (d: KbDocument[]) => KbDocument[]) => update((w) => ({ ...w, documents: fn(w.documents) })), [update])
+  const actions: DocActions | undefined = live
+    ? {
+        upload: (files) => files.forEach((f) => void commit(live.uploadDocument(f, { category: 'SOP / Procedure', visibility: 'Company' }), `${f.name} uploaded — indexing on the server`)),
+        patch: (id, patch) => void commit(live.patchDocument(id, patch), 'Document ACL updated — chunks re-tagged'),
+        remove: (id) => void commit(live.deleteDocument(id), 'Document and its chunks deleted'),
+      }
+    : undefined
   const canEdit = isOwnerLike(perms.roles) || can(perms, 'knowledge', 'configure')
   const owner = isOwnerLike(perms.roles)
   // Readers only list documents their ACL allows (same rule as retrieval); editors manage the whole library.
   const visible = canEdit ? ws.documents : ws.documents.filter((d) => d.visibility === 'Company' || (d.visibility === 'Module' && d.module && perms.pages.has(d.module)) || (d.visibility === 'Restricted' && owner))
   const rag = ragState(ws.documents)
+  // Live: follow server-side processing (uploaded → extracting → tagging → indexed) faster than the 15 s poll.
+  const processing = !!live && rag.pending > 0
+  useEffect(() => {
+    if (!processing || !live) return
+    const id = setInterval(() => void commit(live.snapshot()), 1500)
+    return () => clearInterval(id)
+  }, [processing, live, commit])
   const tabs: Array<TabDef<KbTab>> = [
     { id: 'documents', label: 'Documents', icon: BookOpen, badge: visible.length, badgeLabel: `${visible.length} documents` },
     { id: 'ingestion', label: 'Ingestion Status', icon: Layers, badge: rag.pending || undefined, badgeTone: 'info', badgeLabel: `${rag.pending} processing` },
@@ -48,10 +62,10 @@ export function KnowledgeView() {
       <TabPanel idBase="kb" id={tab}>
         {tab === 'documents' && (
           <div className="space-y-4">
-            {canEdit && <UploadZone setDocs={setDocs} compact />}
+            {canEdit && <UploadZone setDocs={setDocs} compact actions={actions} />}
             <Panel eyebrow={canEdit ? 'Library · all documents' : 'Documents your role can read'} title={`${visible.length} documents`} bodyClassName="p-0">
               {visible.length ? (
-                <DocumentTable docs={visible} setDocs={setDocs} readOnly={!canEdit} />
+                <DocumentTable docs={visible} setDocs={setDocs} readOnly={!canEdit} actions={actions} />
               ) : (
                 <p className="px-4 py-6 text-[13px] text-muted">No documents yet{canEdit ? ' — drop PDFs above or add the demo set.' : '.'}</p>
               )}

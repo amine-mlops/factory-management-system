@@ -1,12 +1,14 @@
 import { ArrowLeft, ArrowRight, Building, CircleCheck, KeyRound, LogOut, Rocket, Sparkles, Users } from 'lucide-react'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { StoryCards } from '../components/story/StoryCards.tsx'
 import { RoleChips } from '../components/workspace/MembersPanel.tsx'
 import { Logo } from '../components/ui/Logo.tsx'
 import { Badge, Button, Eyebrow } from '../components/ui/primitives.tsx'
-import { navItem } from '../data/nav.ts'
+import { navItem, type ViewId } from '../data/nav.ts'
 import { roleDef } from '../lib/access.ts'
-import { joinWithCode, lookupInvite, membershipsFor, openDemoCompany, openMembership, previewPages } from '../lib/mockDb.ts'
+import { describeError } from '../lib/api.ts'
+import { live } from '../lib/live.ts'
+import { joinWithCode, lookupInvite, membershipsFor, openDemoCompany, openMembership, previewPages, type Membership } from '../lib/mockDb.ts'
 import { DEMO_INVITES, type InviteCode, type Workspace } from '../lib/workspace.ts'
 import type { Session } from './Login.tsx'
 
@@ -15,11 +17,49 @@ interface Props {
   onEnter: (ws: Workspace) => void
   onSetup: () => void
   onLogout: () => void
+  /** Error from re-hydrating a live session (shown above the choices). */
+  notice?: string | null
 }
 
-export function WorkspaceChoice({ session, onEnter, onSetup, onLogout }: Props) {
+const DEMO_TENANT = 'tnt_plant_a_demo'
+
+export function WorkspaceChoice({ session, onEnter, onSetup, onLogout, notice }: Props) {
   const [mode, setMode] = useState<'choose' | 'join'>('choose')
-  const memberships = membershipsFor(session.email)
+  const [liveMemberships, setLiveMemberships] = useState<Membership[] | null>(null)
+  const [error, setError] = useState<string | null>(notice ?? null)
+  const [busy, setBusy] = useState(false)
+  const memberships = live ? (liveMemberships ?? []) : membershipsFor(session.email)
+
+  // Live mode: GET /api/auth/session lists the companies this user belongs to.
+  useEffect(() => {
+    if (!live) return
+    let alive = true
+    live
+      .session()
+      .then((s) => alive && setLiveMemberships(s.memberships.map((m) => ({ tenantId: m.company_id, tenantName: m.company_name, roles: m.roles, userId: s.user.id }))))
+      .catch((err) => alive && setError(describeError(err)))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  /** Live: POST /auth/company (new token for that tenant) → GET /workspace. Mock: local store. */
+  const open = async (tenantId: string, demo = false) => {
+    if (!live) {
+      const w = demo ? openDemoCompany(session.name, session.email) : openMembership(tenantId, session.email)
+      if (w) onEnter(w)
+      return
+    }
+    setBusy(true)
+    try {
+      await live.selectCompany(tenantId)
+      onEnter(await live.snapshot())
+    } catch (err) {
+      setError(describeError(err))
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <main className="mx-auto flex min-h-screen max-w-[1180px] flex-col px-5 py-8 sm:px-8">
       <header className="flex items-center justify-between gap-4">
@@ -56,10 +96,8 @@ export function WorkspaceChoice({ session, onEnter, onSetup, onLogout }: Props) 
                     <li key={m.tenantId}>
                       <button
                         type="button"
-                        onClick={() => {
-                          const w = openMembership(m.tenantId, session.email)
-                          if (w) onEnter(w)
-                        }}
+                        disabled={busy}
+                        onClick={() => void open(m.tenantId)}
                         className="panel flex w-full items-center gap-3 px-4 py-3 text-left hover:border-accent/60"
                       >
                         <Building className="size-4 shrink-0 text-accent" aria-hidden />
@@ -97,7 +135,12 @@ export function WorkspaceChoice({ session, onEnter, onSetup, onLogout }: Props) 
               />
             </div>
 
-            <button type="button" onClick={() => onEnter(openDemoCompany(session.name, session.email))} className="mt-6 flex min-h-10 items-center gap-2 rounded-md text-[13px] text-muted hover:text-accent-2">
+            {error && (
+              <p role="alert" className="mt-4 text-[13px] text-warn">
+                {error}
+              </p>
+            )}
+            <button type="button" disabled={busy} onClick={() => void open(DEMO_TENANT, true)} className="mt-6 flex min-h-10 items-center gap-2 rounded-md text-[13px] text-muted hover:text-accent-2">
               <Sparkles className="size-3.5" aria-hidden /> Skip — open the pre-configured demo company (Acme Process Industries, all modules)
               <ArrowRight className="size-3.5" aria-hidden />
             </button>
@@ -113,7 +156,9 @@ export function WorkspaceChoice({ session, onEnter, onSetup, onLogout }: Props) 
           <JoinFlow session={session} onBack={() => setMode('choose')} onEnter={onEnter} />
         )}
       </div>
-      <p className="text-center text-xs text-faint">Demo workspace flows run entirely on local mock state — no invitations are sent and no data leaves the browser.</p>
+      <p className="text-center text-xs text-faint">
+        {live ? 'Live mode — companies, invitations and data come from the FastAPI backend.' : 'Demo workspace flows run entirely on local mock state — no invitations are sent and no data leaves the browser.'}
+      </p>
     </main>
   )
 }
@@ -148,19 +193,41 @@ function ChoiceCard(p: { icon: ReactNode; eyebrow: string; title: string; body: 
 
 function JoinFlow({ session, onBack, onEnter }: { session: Session; onBack: () => void; onEnter: (ws: Workspace) => void }) {
   const [code, setCode] = useState('')
-  const [found, setFound] = useState<{ invite: InviteCode; ws: Workspace | null } | null>(null)
+  const [found, setFound] = useState<{ invite: InviteCode; ws: Workspace | null; tenantName?: string; pages?: ViewId[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const notFound = 'Invite not recognized. Codes are case-insensitive — use a code your owner generated, or a demo code below.'
 
   const check = (e?: FormEvent, value = code) => {
     e?.preventDefault()
+    if (live) {
+      // GET /api/invites/{code} — 404 when invalid, used or expired.
+      live
+        .previewInvite(value)
+        .then((p) => {
+          setFound({ invite: { code: p.code, tenantId: '', roles: p.roles, createdBy: p.invitedBy, createdAt: '' }, ws: null, tenantName: p.companyName, pages: p.pages })
+          setError(null)
+        })
+        .catch(() => {
+          setFound(null)
+          setError(notFound)
+        })
+      return
+    }
     const f = lookupInvite(value)
     setFound(f)
-    setError(f ? null : 'Invite not recognized. Codes are case-insensitive — use a code your owner generated, or a demo code below.')
+    setError(f ? null : notFound)
   }
 
-  const tenantName = found?.ws?.tenant.name ?? 'Acme Process Industries'
-  const pages = found ? previewPages(found.ws, found.invite.roles) : []
+  const tenantName = found?.tenantName ?? found?.ws?.tenant.name ?? 'Acme Process Industries'
+  const pages = found ? (found.pages ?? previewPages(found.ws, found.invite.roles)) : []
   const join = () => {
+    if (live) {
+      live
+        .acceptInvite(found?.invite.code ?? code)
+        .then(onEnter)
+        .catch((err) => setError(`This invite could not be redeemed — ${describeError(err)}`))
+      return
+    }
     const r = joinWithCode(code, session.name, session.email)
     if (r) onEnter(r.ws)
     else setError('This invite could not be redeemed.')
@@ -215,7 +282,7 @@ function JoinFlow({ session, onBack, onEnter }: { session: Session; onBack: () =
           <div className="mt-6 animate-rise rounded-lg border border-accent/40 bg-accent/[0.05] p-4" aria-live="polite">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <Eyebrow className="text-accent">Invitation found · local mock of POST /invites/accept</Eyebrow>
+                <Eyebrow className="text-accent">Invitation found · {live ? 'GET /api/invites/{code}' : 'local mock of POST /invites/accept'}</Eyebrow>
                 <p className="mt-2 text-lg font-semibold text-fg">{tenantName}</p>
                 <p className="text-[13px] text-muted">
                   Code <span className="num text-fg-2">{found.invite.code}</span> · issued by {found.invite.createdBy}

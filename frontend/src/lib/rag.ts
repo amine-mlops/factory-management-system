@@ -2,6 +2,7 @@ import { FEFO_POLICY } from '../data/expiry.ts'
 import type { ModuleId, ViewId } from '../data/nav.ts'
 import { can, scopeOf, type EffectivePermissions, type RoleId, type TenantId, type UserId } from './access.ts'
 import { ACTION_META, assessLots, summarize } from './expiry.ts'
+import type { RagAnswer } from './apiContract.ts'
 import type { Workspace } from './workspace.ts'
 
 /**
@@ -594,12 +595,8 @@ export function sourceLabel(c: Chunk) {
 }
 
 /** Canonical FastAPI /rag/query response (required: answer + sources; the rest optional). */
-export interface AiAnswerResponse {
-  answer: string
-  sources: Array<{ document: string; page: number }>
-  freshness?: Array<{ source: string; as_of: string; stale: boolean }>
-  decision?: { status: 'allowed' | 'denied'; stage: 'pre-retrieval' | 'retrieval'; reason?: string }
-}
+/** Canonical AI answer (same contract as `RagAnswer` in apiContract.ts). */
+export type AiAnswerResponse = RagAnswer
 
 export function toAiAnswerResponse(a: Answer): AiAnswerResponse {
   return {

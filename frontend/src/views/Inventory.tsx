@@ -269,11 +269,12 @@ function WeekChart({ summary }: { summary: ExpirySummary }) {
 }
 
 function AgentStatus({ summary }: { summary: ExpirySummary }) {
-  const { ws, perms, update } = useWorkspace()
+  const { ws, perms, update, live, commit } = useWorkspace()
   const notify = useNotify()
   const canRun = can(perms, 'inventory', 'manage') || can(perms, 'inventory', 'configure')
   const run = summary.lastRun
   const scan = () => {
+    if (live) return void commit(live.runExpiryScan(), 'Expiry scan completed')
     update((w) => withScan(w, new Date(), 'manual'))
     notify('Expiry scan completed (simulated)', 'info')
   }
@@ -502,7 +503,7 @@ function StatusBadge({ a }: { a: ExpiryAction }) {
 }
 
 function ActionsTab({ lots, onLot }: { lots: LotRisk[]; onLot: (id: string) => void }) {
-  const { ws, perms, update, log, me } = useWorkspace()
+  const { ws, perms, update, log, me, live, commit } = useWorkspace()
   const notify = useNotify()
   const [filter, setFilter] = useState<'proposed' | 'approved' | 'dismissed' | 'all'>('proposed')
   const all = ws.expiry.actions
@@ -511,6 +512,10 @@ function ActionsTab({ lots, onLot }: { lots: LotRisk[]; onLot: (id: string) => v
   const decide = (a: ExpiryAction, status: ExpiryAction['status']) => {
     if (!canDecide(perms, a)) return
     const who = me.email.split('@')[0] || me.name
+    if (live) {
+      const verbLive = status === 'approved' ? 'approved' : status === 'dismissed' ? 'dismissed' : 'reopened'
+      return void commit(live.decideExpiryAction(a.id, status), `${a.id} ${verbLive}${status === 'approved' && a.external ? ' — hand-off queued (simulated)' : ''}`)
+    }
     update((w) => ({ ...w, expiry: decideAction(w.expiry, a.id, status, who, new Date()) }))
     const verb = status === 'approved' ? 'approved' : status === 'dismissed' ? 'dismissed' : 'reopened'
     log(`Expiry action ${verb}`, `${a.id} · ${a.title}${status === 'approved' && a.external ? ' · external hand-off queued (simulated — nothing sent)' : ''}`, status === 'approved' ? 'nv' : 'info', 'inventory')
@@ -836,7 +841,7 @@ function EventMetadata() {
 }
 
 function RulesForm() {
-  const { ws, perms, update, log, me } = useWorkspace()
+  const { ws, perms, update, log, me, live, commit } = useWorkspace()
   const notify = useNotify()
   const r = ws.expiry.rules
   const editable = can(perms, 'inventory', 'manage')
@@ -853,6 +858,11 @@ function RulesForm() {
       return
     }
     setError(null)
+    if (live) {
+      // Same validation ran locally for instant feedback; FastAPI re-validates, versions and audits the change.
+      const changed = Object.fromEntries(Object.entries(patch).filter(([k, v]) => r[k as keyof RulesPatch] !== v)) as RulesPatch
+      return void commit(live.updateExpiryRules(changed), `Rules v${res.state.rules.version} saved — lots re-classified`)
+    }
     update((w) => ({ ...w, expiry: res.state }))
     log('Expiry rules updated', `v${res.state.rules.version}: ${res.change}`, 'info', 'inventory')
     notify(`Rules v${res.state.rules.version} saved — lots re-classified (demo)`, 'nv')

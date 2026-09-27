@@ -1,12 +1,60 @@
 [
   {
-    "rule_id": "RULE-COLD-01",
-    "label": "dairy batches in transit: current_temp > 4°C",
-    "category": "dairy",
-    "metric": "current_temp",
-    "comparator": ">",
-    "threshold": 4.0,
-    "duration_hours": 0.0,
-    "severity": "high"
+    "id": "RULE-COLD-01",
+    "label": "Cold-Chain Dairy Compliance",
+    "severity": "CRITICAL",
+    "active": true,
+    "source": "seed",
+    "text": "Flag any dairy batch whose temperature exceeds its safe maximum",
+    "table": "inventory",
+    "conditions": [
+      {
+        "field": "category",
+        "op": "=",
+        "value": "Dairy"
+      },
+      {
+        "field": "current_temp",
+        "op": ">",
+        "field_ref": "max_safe_temp"
+      }
+    ]
+  },
+  {
+    "id": "RULE-EXP-01",
+    "label": "Expiry — critical window",
+    "severity": "CRITICAL",
+    "active": true,
+    "source": "seed",
+    "text": "Flag lots expiring within the critical window",
+    "table": "inventory",
+    "conditions": [
+      {
+        "field": "days_remaining",
+        "op": "<=",
+        "param": "critical_days"
+      }
+    ]
+  },
+  {
+    "id": "RULE-EXP-02",
+    "label": "Expiry — warning window",
+    "severity": "WARNING",
+    "active": true,
+    "source": "seed",
+    "text": "Flag lots expiring within the warning window",
+    "table": "inventory",
+    "conditions": [
+      {
+        "field": "days_remaining",
+        "op": "<=",
+        "param": "warning_days"
+      },
+      {
+        "field": "days_remaining",
+        "op": ">",
+        "param": "critical_days"
+      }
+    ]
   }
 ]

@@ -1,5 +1,7 @@
 # Integrating this UI into the Factory Management repository
 
+> **Status (live backend available).** The FastAPI backend now lives in this repository (`backend/`, see the root `README.md` and `MASTER_SPEC.md` §7 and §11). With `VITE_USE_MOCK=false` and `VITE_API_URL=/api`, sign-in, the workspace snapshot, every mutation, the assistant and the Compliance tab call FastAPI through `src/lib/live.ts`. Mock mode is unchanged. The migration notes below describe the original standalone hand-off and are kept for reference.
+
 This repository is a **standalone, export-ready React/Vite frontend**. Its contents are meant to be copied into the original repository's `frontend/` directory. It contains no backend code and does not depend on any backend file. Every feature keeps working on local mock data (`VITE_USE_MOCK=true`), so copying it in cannot break the Python backend.
 
 > **About Streamlit.** The team plan mentions a Streamlit `frontend/app.py`. The approved frontend is this React/Vite app, **not** Streamlit. When you merge, the React build **replaces** `app.py` as the user-facing UI. You can keep `app.py` next to it (for example as `frontend/legacy_app.py`) for internal tooling; the two do not conflict.

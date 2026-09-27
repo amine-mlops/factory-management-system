@@ -2,6 +2,7 @@ import { ArrowRight, Eye, EyeOff, Info, KeyRound, LoaderCircle, Lock, Mail, Shie
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { StoryCards } from '../components/story/StoryCards.tsx'
 import { Logo } from '../components/ui/Logo.tsx'
+import { describeError } from '../lib/api.ts'
 import { cx, delay } from '../lib/format.ts'
 import { prefersReducedMotion } from '../lib/useNow.ts'
 
@@ -25,15 +26,31 @@ function sessionFor(email: string): Session {
   return { name, email, role: 'Member', initials }
 }
 
-export function Login({ onLogin }: { onLogin: (s: Session) => void }) {
+interface LoginProps {
+  onLogin: (s: Session) => void
+  /** Live mode: verify credentials with FastAPI (POST /api/auth/login). Absent in mock mode. */
+  authenticate?: (email: string, password: string) => Promise<Session>
+}
+
+export function Login({ onLogin, authenticate }: LoginProps) {
   const [email, setEmail] = useState(DEMO_CREDENTIALS.email)
   const [password, setPassword] = useState(DEMO_CREDENTIALS.password)
   const [show, setShow] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'form' | 'demo' | null>(null)
 
-  const enter = async (session: Session, mode: 'form' | 'demo') => {
+  const enter = async (session: Session, mode: 'form' | 'demo', password: string) => {
     setBusy(mode)
+    if (authenticate) {
+      try {
+        const verified = await authenticate(session.email, password)
+        onLogin(session.email.toLowerCase() === DEMO_CREDENTIALS.email ? { ...DEMO_SESSION, name: verified.name } : verified)
+      } catch (err) {
+        setBusy(null)
+        setError(`Sign-in failed — ${describeError(err)}`)
+      }
+      return
+    }
     await delay(prefersReducedMotion() ? 0 : 520)
     onLogin(session)
   }
@@ -43,7 +60,7 @@ export function Login({ onLogin }: { onLogin: (s: Session) => void }) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError('Enter a valid work email address.')
     if (password.length < 4) return setError('Password must be at least 4 characters.')
     setError(null)
-    void enter(sessionFor(email.trim()), 'form')
+    void enter(sessionFor(email.trim()), 'form', password)
   }
 
   return (
@@ -65,7 +82,8 @@ export function Login({ onLogin }: { onLogin: (s: Session) => void }) {
           <StoryCards compact className="mt-6" />
         </div>
         <p className="flex items-center gap-2 text-xs text-muted">
-          <Info className="size-3.5 shrink-0" aria-hidden /> Demo environment — sign-in, company data and AI answers are simulated locally in this browser.
+          <Info className="size-3.5 shrink-0" aria-hidden />
+          {authenticate ? 'Live mode — sign-in, company data and AI answers come from the FastAPI backend.' : 'Demo environment — sign-in, company data and AI answers are simulated locally in this browser.'}
         </p>
       </section>
 
@@ -80,7 +98,9 @@ export function Login({ onLogin }: { onLogin: (s: Session) => void }) {
           <div className="panel p-7">
             <p className="eyebrow">Demo sign-in</p>
             <h2 className="mt-2 text-[22px] font-semibold tracking-tight text-fg">Sign in to NEXUS</h2>
-            <p className="mt-1.5 text-sm text-muted">Authentication is simulated locally — use any work email or the demo account.</p>
+            <p className="mt-1.5 text-sm text-muted">
+              {authenticate ? 'Signs in against the FastAPI backend — use a seeded demo account.' : 'Authentication is simulated locally — use any work email or the demo account.'}
+            </p>
 
             <form className="mt-7 space-y-4" onSubmit={submit} noValidate>
               <Field id="email" label="Work email" icon={<Mail className="size-4" aria-hidden />}>
@@ -138,7 +158,7 @@ export function Login({ onLogin }: { onLogin: (s: Session) => void }) {
 
             <button
               type="button"
-              onClick={() => void enter(DEMO_SESSION, 'demo')}
+              onClick={() => void enter(DEMO_SESSION, 'demo', DEMO_CREDENTIALS.password)}
               disabled={busy !== null}
               className="group flex h-12 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:opacity-70"
             >

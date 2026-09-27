@@ -1,0 +1,32 @@
+# docker compose up --build   →   http://localhost:8080  (click "Enter demo workspace")
+name: nexus
+services:
+  api:
+    build: .
+    environment:
+      DEMO_MODE: ${DEMO_MODE:-true}
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_TTL_MINUTES: ${JWT_TTL_MINUTES:-480}
+      AUDIT_SCHEDULER: ${AUDIT_SCHEDULER:-on}
+      AUDIT_INTERVAL_SECONDS: ${AUDIT_INTERVAL_SECONDS:-300}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-meta/llama-3.1-70b-instruct}
+    volumes:
+      - nexus-data:/data
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  nexus-data:

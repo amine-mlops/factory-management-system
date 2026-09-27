@@ -14,9 +14,19 @@ import { useWorkspace } from '../lib/workspaceContext.ts'
 type TeamTab = 'members' | 'invitations' | 'roles' | 'audit'
 
 export function TeamView() {
-  const { ws, perms, update, log, me } = useWorkspace()
+  const { ws, perms, update, log, me, live, commit } = useWorkspace()
   const canEdit = isOwnerLike(perms.roles)
-  const setMembers = useCallback((fn: (m: Member[]) => Member[]) => update((w) => ({ ...w, members: fn(w.members) })), [update])
+  const setMembers = useCallback(
+    (fn: (m: Member[]) => Member[]) => {
+      if (!live) return update((w) => ({ ...w, members: fn(w.members) }))
+      // Live: PUT /members/{id}/roles for every member whose roles changed (the server re-checks team:manage).
+      for (const m of fn(ws.members)) {
+        const cur = ws.members.find((x) => x.userId === m.userId)
+        if (cur && cur.roles.join() !== m.roles.join()) void commit(live.setMemberRoles(m.userId, m.roles), `${m.name}: roles updated`)
+      }
+    },
+    [update, live, commit, ws.members],
+  )
   const active = ws.members.filter((m) => m.status === 'active').length
   const unused = ws.invites.filter((i) => !i.usedBy).length
   const tabs: Array<TabDef<TeamTab>> = [
@@ -52,11 +62,12 @@ export function TeamView() {
         )}
         {tab === 'invitations' && (
           <div className="grid gap-4 @4xl:grid-cols-2">
-            <Panel eyebrow="Invitation codes · mock of POST /invites" title="Share a join code">
+            <Panel eyebrow={live ? 'Invitation codes · POST /api/invites' : 'Invitation codes · mock of POST /invites'} title="Share a join code">
               {canEdit ? (
                 <InviteCodesPanel
                   invites={ws.invites}
                   onGenerate={(roles) => {
+                    if (live) return void commit(live.createInvite(roles), 'Invitation code generated')
                     const inv = generateInvite(ws, roles, me.name)
                     update((w) => ({ ...w, invites: [inv, ...w.invites] }))
                     log('Invitation code generated', `${inv.code} → ${roles.map((r) => roleDef(r).label).join(' + ')}`, 'nv', 'team')
@@ -67,7 +78,13 @@ export function TeamView() {
               )}
             </Panel>
             <Panel eyebrow="Invite by email" title="Add a member">
-              {canEdit ? <InviteMemberForm members={ws.members} setMembers={setMembers} onEvent={onEvent} /> : <p className="text-[13px] text-muted">Only owners and admins can invite members.</p>}
+              {!canEdit ? (
+                <p className="text-[13px] text-muted">Only owners and admins can invite members.</p>
+              ) : live ? (
+                <p className="text-[13px] text-muted">Live mode: share an invitation code — the new member signs in and redeems it (POST /api/invites/{'{code}'}/accept).</p>
+              ) : (
+                <InviteMemberForm members={ws.members} setMembers={setMembers} onEvent={onEvent} />
+              )}
             </Panel>
           </div>
         )}

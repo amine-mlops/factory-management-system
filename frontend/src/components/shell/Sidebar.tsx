@@ -3,6 +3,7 @@ import { useEffect, type ReactNode } from 'react'
 import { MODULE_NAV, PRIMARY_NAV, WORKSPACE_NAV, type NavItem, type ViewId } from '../../data/nav.ts'
 import { moduleStage, roleDef } from '../../lib/access.ts'
 import { cx } from '../../lib/format.ts'
+import { live } from '../../lib/live.ts'
 import { useOpsModel } from '../../lib/useOps.ts'
 import { useMediaQuery } from '../../lib/useNow.ts'
 import { useWorkspace } from '../../lib/workspaceContext.ts'
@@ -102,7 +103,7 @@ export function Sidebar({ view, onNavigate, open, onClose }: Props) {
             <p className="eyebrow mb-2">Environment</p>
             <p className="flex items-center gap-2 text-fg-2">
               {useMock ? <HardDrive className="size-3.5 text-info" aria-hidden /> : <Database className="size-3.5 text-accent" aria-hidden />}
-              {useMock ? 'Demo · local mock store' : 'FastAPI + local fallback'}
+              {live ? (useMock ? 'FastAPI data · assistant simulated locally' : 'FastAPI · live data') : useMock ? 'Demo · local mock store' : 'FastAPI + local fallback'}
             </p>
             <p className="mt-1.5 flex items-center gap-2 text-muted">
               <Cpu className="size-3.5" aria-hidden /> NVIDIA NIM · architecture target

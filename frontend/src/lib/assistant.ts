@@ -1,6 +1,8 @@
 import type { ViewId } from '../data/nav.ts'
 import { ApiError, apiRequest, describeError, ENDPOINTS } from './api.ts'
 import { can, type EffectivePermissions, type UserId } from './access.ts'
+import type { AnswerDiagnostics, DeniedDetail } from './apiContract.ts'
+import { live } from './live.ts'
 import { audienceFor } from './insights.ts'
 import { authorizeQuery, incidentFor, type GateDecision } from './guard.ts'
 import { answer, buildCorpus, QUESTIONS, retrieve, sourceLabel, toAiAnswerResponse, type AiAnswerResponse, type Answer, type Question } from './rag.ts'
@@ -33,6 +35,8 @@ export interface AnswerView {
   staleNotice: string | null
   trace: { candidates: number; afterTenant: number; afterPermission: number; afterScope: number }
   response: AiAnswerResponse
+  /** Live answers only: intent, SQL, structured rows, retrieved snippets and the root-cause verdict. */
+  diagnostics?: AnswerDiagnostics
 }
 
 export type AskOutcome =
@@ -99,15 +103,37 @@ export function toView(a: Answer, q: Question): AnswerView {
 }
 
 function fromLive(r: AiAnswerResponse, q: Question): AnswerView {
+  const gaps = r.gaps ?? []
+  // The server appends gaps to `answer`; show them once, as gap callouts.
+  const text = gaps.reduce((t, g) => t.replace(g, ''), r.answer).trim()
+  const stale = r.freshness?.find((f) => f.stale)
   return {
     questionId: q.id,
-    sentences: [{ text: r.answer, cites: r.sources.map((_, i) => i + 1) }],
+    sentences: [{ text, cites: [] }],
     citations: r.sources.map((s, i) => ({ n: i + 1, label: `${s.document}${s.page ? ` · p.${s.page}` : ''}`, kind: s.page ? 'pdf' : 'record', updatedAt: r.freshness?.[i]?.as_of ?? '—', stale: r.freshness?.[i]?.stale ?? false })),
-    gaps: [],
-    staleNotice: null,
-    trace: { candidates: 0, afterTenant: 0, afterPermission: 0, afterScope: r.sources.length },
+    gaps,
+    staleNotice: stale && !gaps.some((g) => g.includes('stale')) ? `${stale.source} as of ${stale.as_of} is stale.` : null,
+    trace: r.diagnostics?.trace ?? { candidates: 0, afterTenant: 0, afterPermission: 0, afterScope: r.sources.length },
     response: r,
+    diagnostics: r.diagnostics,
   }
+}
+
+const isDenied = (v: unknown): v is DeniedDetail => typeof v === 'object' && v !== null && (v as DeniedDetail).decision === 'denied'
+
+/** Builds the UI decision + incident from FastAPI's 403 `detail` (the incident itself is already logged server-side). */
+function deniedFromServer(err: ApiError, fallback: GateDecision, query: string, ctx: AskContext): AskOutcome {
+  const d = isDenied(err.detail) ? err.detail : null
+  const decision: GateDecision = {
+    ...fallback,
+    allowed: false,
+    status: 403,
+    resource: (d?.resource as GateDecision['resource']) ?? fallback.resource,
+    resourceLabel: d?.resourceLabel ?? fallback.resourceLabel,
+    reason: d?.reason ?? (typeof err.detail === 'string' ? err.detail : 'Denied by FastAPI'),
+  }
+  const incident = incidentFor(query, decision, ctx.perms, { userId: ctx.userId, name: ctx.userName })
+  return { kind: 'denied', decision, incident: d?.incidentId ? { ...incident, id: d.incidentId } : incident }
 }
 
 const isRagAnswer = (v: unknown): v is AiAnswerResponse =>
@@ -122,19 +148,20 @@ export function localAnswer(query: string, resource: ViewId, ctx: AskContext): A
 
 export async function askAssistant(query: string, ctx: AskContext): Promise<AskOutcome> {
   const decision = authorizeQuery(query, ctx.perms, ctx.context)
-  if (!decision.allowed) return { kind: 'denied', decision, incident: incidentFor(query, decision, ctx.perms, { userId: ctx.userId, name: ctx.userName }) }
-  const resource = decision.resource as ViewId
+  // Live build: the server's pre-retrieval gate is authoritative (and logs the incident), so every question goes to FastAPI.
+  const serverGate = !!live && !ctx.useMock
+  if (!decision.allowed && !serverGate) return { kind: 'denied', decision, incident: incidentFor(query, decision, ctx.perms, { userId: ctx.userId, name: ctx.userName }) }
+  const resource = (decision.allowed ? decision.resource : ctx.context) as ViewId
   const local = localAnswer(query, resource, ctx)
   if (ctx.useMock) return { kind: 'answer', view: local, source: 'local', resourceLabel: decision.resourceLabel }
   try {
-    const r = await apiRequest<unknown>(ENDPOINTS.ragQuery, { method: 'POST', body: { question: query, module: resource }, fetchImpl: ctx.fetchImpl })
+    const r = await apiRequest<unknown>(ENDPOINTS.ragQuery, { method: 'POST', body: { question: query, module: serverGate ? ctx.context : resource }, fetchImpl: ctx.fetchImpl, timeoutMs: 15_000 })
     if (!isRagAnswer(r)) throw new Error('response did not match { answer, sources }')
-    return { kind: 'answer', view: fromLive(r, pickQuestion(resource, query, ctx.context)), source: 'live', resourceLabel: decision.resourceLabel }
+    const label = r.decision?.resourceLabel || decision.resourceLabel
+    return { kind: 'answer', view: fromLive(r, pickQuestion(resource, query, ctx.context)), source: 'live', resourceLabel: label }
   } catch (err) {
-    if (err instanceof ApiError && err.status === 403) {
-      const denied: GateDecision = { ...decision, allowed: false, status: 403, reason: typeof err.detail === 'string' ? err.detail : 'Denied by FastAPI' }
-      return { kind: 'denied', decision: denied, incident: incidentFor(query, denied, ctx.perms, { userId: ctx.userId, name: ctx.userName }) }
-    }
+    if (err instanceof ApiError && err.status === 403) return deniedFromServer(err, decision, query, ctx)
+    if (!decision.allowed) return { kind: 'denied', decision, incident: incidentFor(query, decision, ctx.perms, { userId: ctx.userId, name: ctx.userName }) }
     return { kind: 'error', message: describeError(err), fallback: local, resourceLabel: decision.resourceLabel }
   }
 }

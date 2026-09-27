@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ViewId } from '../../data/nav.ts'
 import { landingPage } from '../../lib/access.ts'
 import { cx, fmtClock, TONE_TEXT } from '../../lib/format.ts'
+import { live } from '../../lib/live.ts'
 import { useOpsModel } from '../../lib/useOps.ts'
 import { useNow } from '../../lib/useNow.ts'
 import { useWorkspace } from '../../lib/workspaceContext.ts'
@@ -67,7 +68,7 @@ export function TopBar({ session, onLogout, onOpenPalette, onToggleNav, onNaviga
           onClick={() => perms.pages.has('settings') && onNavigate('settings', 'integrations')}
           disabled={!perms.pages.has('settings')}
           className={cx('hidden h-9 items-center gap-2 rounded-md border px-2.5 text-xs font-medium xl:flex', useMock ? 'border-info/40 text-info' : 'border-accent/45 text-accent-2', 'disabled:cursor-default')}
-          title={useMock ? 'USE_MOCK on — every screen reads the local mock store' : 'Assistant calls FastAPI; errors fall back to the local simulation'}
+          title={live ? (useMock ? 'Live data from FastAPI; the assistant is switched to the local simulation' : 'Live data and assistant from FastAPI') : useMock ? 'USE_MOCK on — every screen reads the local mock store' : 'Assistant calls FastAPI; errors fall back to the local simulation'}
           aria-label={useMock ? 'Data mode: demo, local mock data' : 'Data mode: FastAPI with local fallback'}
         >
           {useMock ? <HardDrive className="size-3.5" aria-hidden /> : <Database className="size-3.5" aria-hidden />}
@@ -178,7 +179,7 @@ function PersonaSwitcher({ personas, active, onPick }: { personas: Persona[]; ac
       </button>
       {open && (
         <div role="menu" aria-label="Preview as persona" className="shadow-overlay absolute right-0 top-12 w-72 animate-rise rounded-lg border border-line-2 bg-overlay p-1.5">
-          <p className="eyebrow px-3 pb-2 pt-2">Owner only · preview as</p>
+          <p className="eyebrow px-3 pb-2 pt-2">{live ? 'Demo personas · real sign-in' : 'Owner only · preview as'}</p>
           {personas.map((p) => (
             <button
               key={p.key}
@@ -198,7 +199,7 @@ function PersonaSwitcher({ personas, active, onPick }: { personas: Persona[]; ac
               {p.key === active && <Check className="size-4 text-accent" aria-hidden />}
             </button>
           ))}
-          <p className="px-3 pb-1 pt-2 text-xs text-muted">Changes what this browser shows. Real authorization happens in FastAPI.</p>
+          <p className="px-3 pb-1 pt-2 text-xs text-muted">{live ? 'Signs in as a seeded demo user (POST /api/auth/demo-login) — FastAPI authorizes every request.' : 'Changes what this browser shows. Real authorization happens in FastAPI.'}</p>
         </div>
       )}
     </div>
@@ -228,7 +229,7 @@ function ProfileMenu({ session, onLogout, onSwitchCompany }: { session: Session;
           <button role="menuitem" type="button" onClick={onLogout} className="mt-1 flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm text-fg-2 hover:bg-crit/10 hover:text-fg">
             <LogOut className="size-4 text-muted" aria-hidden /> Sign out
           </button>
-          <p className="px-3 pb-1 pt-2 text-xs text-muted">Demo sign-in — authentication is simulated locally.</p>
+          <p className="px-3 pb-1 pt-2 text-xs text-muted">{live ? 'Signed in with a FastAPI JWT (sessionStorage).' : 'Demo sign-in — authentication is simulated locally.'}</p>
         </div>
       )}
     </div>

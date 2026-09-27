@@ -42,7 +42,7 @@ const SHIFT_TASKS = [
 
 /** Shared shipment state + guarded actions (UX mirror of the backend's update_status / manage checks). */
 function useShipments() {
-  const { ws, update, log, perms, actingUserId } = useWorkspace()
+  const { ws, update, log, perms, actingUserId, live, commit } = useWorkspace()
   const notify = useNotify()
   const assigned = scopeOf(perms, 'transportation') === 'assigned'
   const visible = (assigned ? ws.shipments.filter((s) => s.driverId === actingUserId) : ws.shipments).slice().sort((a, b) => (a.driverName + a.stopOrder).localeCompare(b.driverName + b.stopOrder))
@@ -54,6 +54,7 @@ function useShipments() {
 
   const setStatus = (sh: Shipment, status: ShipmentStatus) => {
     if (!canUpdate || (assigned && sh.driverId !== actingUserId)) return
+    if (live) return void commit(live.setShipmentStatus(sh.id, status), `${sh.id} marked ${status}`)
     update((w) => ({ ...w, shipments: w.shipments.map((x) => (x.id === sh.id ? { ...x, status } : x)) }))
     log('Shipment status updated', `${sh.id} → ${status} (${sh.customer})`, status === 'Delayed' ? 'warn' : 'nv', 'transportation')
     notify(`${sh.id} marked ${status}`, status === 'Delayed' ? 'warn' : 'nv')
@@ -61,6 +62,7 @@ function useShipments() {
   const assign = (sh: Shipment, driverId: string) => {
     if (!canManage) return
     const d = drivers.find((x) => x.userId === driverId)
+    if (live) return void commit(live.assignShipment(sh.id, d?.userId ?? null), `${sh.id} assigned to ${d?.name ?? 'nobody'}`)
     update((w) => ({ ...w, shipments: w.shipments.map((x) => (x.id === sh.id ? { ...x, driverId: d?.userId ?? null, driverName: d?.name ?? 'Unassigned' } : x)) }))
     log('Shipment reassigned', `${sh.id} → ${d?.name ?? 'Unassigned'}`, 'info', 'transportation')
     notify(`${sh.id} assigned to ${d?.name ?? 'nobody'}`, 'info')

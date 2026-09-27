@@ -12,7 +12,7 @@ import { useWorkspace } from '../lib/workspaceContext.ts'
  * return 403 for the page's data). UX mirror only — not the security boundary.
  */
 export function AccessDenied({ page, onBack }: { page: ViewId; onBack: () => void }) {
-  const { perms, ws, log, recordIncident, me } = useWorkspace()
+  const { perms, ws, log, recordIncident, me, live, commit } = useWorkspace()
   const notify = useNotify()
   const logged = useRef(false)
   const [requested, setRequested] = useState(false)
@@ -25,6 +25,11 @@ export function AccessDenied({ page, onBack }: { page: ViewId; onBack: () => voi
   useEffect(() => {
     if (logged.current || perms.reason(page) !== 'not_granted') return
     logged.current = true
+    if (live) {
+      // POST /audit/security-events — the server re-checks the grant and only logs a real denial.
+      void live.logRouteDenial(page, `GET #/${page}`).then(() => commit(live.snapshot()), () => undefined)
+      return
+    }
     recordIncident({
       id: `inc_${Date.now().toString(36)}_rt`,
       at: new Date().toISOString(),
@@ -40,7 +45,7 @@ export function AccessDenied({ page, onBack }: { page: ViewId; onBack: () => voi
       chunksRetrieved: 0,
       sentToModel: false,
     })
-  }, [page, perms, me, recordIncident])
+  }, [page, perms, me, recordIncident, live, commit])
 
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-var(--header-h))] max-w-xl flex-col items-center justify-center px-5 py-10 text-center">
@@ -70,6 +75,7 @@ export function AccessDenied({ page, onBack }: { page: ViewId; onBack: () => voi
             disabled={requested}
             onClick={() => {
               setRequested(true)
+              if (live) return void commit(live.requestAccess(page), `Access request for ${item.label} sent to workspace owners.`)
               log('Access requested', `${roles} requested ${item.label}`, 'warn', 'team')
               notify(`Access request for ${item.label} sent to workspace owners (demo).`, 'info')
             }}

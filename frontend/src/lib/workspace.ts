@@ -8,9 +8,9 @@ import type { Tone } from './format.ts'
 /* ------------------------------------------------------------ knowledge */
 
 /** PDF lifecycle: uploaded → extracted/chunked → ACL metadata tagged → indexed (RAG-ready). Distinct from Gold tables. */
-export type DocStatus = 'uploaded' | 'extracting' | 'tagging' | 'indexed'
+export type DocStatus = 'uploaded' | 'extracting' | 'tagging' | 'indexed' | 'failed'
 
-export const DOC_STAGES: Array<{ id: DocStatus; label: string }> = [
+export const DOC_STAGES: Array<{ id: Exclude<DocStatus, 'failed'>; label: string }> = [
   { id: 'uploaded', label: 'Uploaded' },
   { id: 'extracting', label: 'Extracted & chunked' },
   { id: 'tagging', label: 'ACL metadata tagged' },
@@ -28,6 +28,8 @@ export interface KbDocument {
   status: DocStatus
   progress: number
   chunks: number
+  /** Server-side processing error (live mode, status `failed`). */
+  error?: string
 }
 
 export const DOC_CATEGORIES = ['SOP / Procedure', 'Equipment manual', 'Safety standard', 'Supplier contract', 'Policy'] as const
@@ -77,7 +79,7 @@ export function aclLabel(d: Pick<KbDocument, 'visibility' | 'module'>) {
 
 export function ragState(docs: KbDocument[]) {
   const indexed = docs.filter((d) => d.status === 'indexed')
-  const pending = docs.length - indexed.length
+  const pending = docs.filter((d) => d.status !== 'indexed' && d.status !== 'failed').length
   return { ready: docs.length > 0 && pending === 0, indexed: indexed.length, pending, chunks: indexed.reduce((s, d) => s + d.chunks, 0) }
 }
 

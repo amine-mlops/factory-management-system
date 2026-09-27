@@ -1,6 +1,7 @@
 import { ArrowRight, Building, CircleCheck, CircleDashed, CircleX, LayoutGrid, List, Lock, Minus, TriangleAlert } from 'lucide-react'
 import { useState, type CSSProperties } from 'react'
 import { navItem, type ModuleId, type ViewId } from '../../data/nav.ts'
+import { live } from '../../lib/live.ts'
 import { cx, fmtClock, TONE_TEXT, type Health } from '../../lib/format.ts'
 import type { ModuleStatus, OpsModel } from '../../lib/insights.ts'
 import { useElementWidth } from '../../lib/useNow.ts'
@@ -81,7 +82,7 @@ export function SystemMap({ model, mode, tenantName, onOpen, canOpenData }: Prop
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted">
-            Updated <time className="num text-fg-2">{fmtClock(model.generatedAt)}</time> · local mock store
+            Updated <time className="num text-fg-2">{fmtClock(model.generatedAt)}</time> · {live ? 'FastAPI snapshot' : 'local mock store'}
           </span>
           {model.staleSources > 0 && (
             <Badge tone="warn">

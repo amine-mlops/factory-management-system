@@ -45,7 +45,7 @@ export function SettingsView() {
 }
 
 function ProfileTab({ canEdit }: { canEdit: boolean }) {
-  const { ws, update, log } = useWorkspace()
+  const { ws, update, log, live, commit } = useWorkspace()
   const notify = useNotify()
   const t = ws.tenant
   const [draft, setDraft] = useState({ name: t.name, industry: t.industry, size: t.size, locations: t.locations.join(', '), context: t.context })
@@ -58,6 +58,7 @@ function ProfileTab({ canEdit }: { canEdit: boolean }) {
     const locations = draft.locations.split(',').map((x) => x.trim()).filter(Boolean)
     if (!locations.length) return setError('Add at least one location.')
     setError(null)
+    if (live) return void commit(live.updateProfile({ name: draft.name.trim(), industry: draft.industry.trim(), size: draft.size, locations, context: draft.context.trim() }), 'Company profile saved')
     update((w) => ({ ...w, tenant: { ...w.tenant, name: draft.name.trim(), industry: draft.industry.trim(), size: draft.size, locations, context: draft.context.trim() } }))
     log('Company profile updated', draft.name.trim(), 'info', 'settings')
     notify('Company profile saved (demo store)', 'nv')
@@ -137,10 +138,11 @@ function ProfileTab({ canEdit }: { canEdit: boolean }) {
 }
 
 function ModulesTab({ canEdit }: { canEdit: boolean }) {
-  const { ws, update, log } = useWorkspace()
+  const { ws, update, log, live, commit } = useWorkspace()
   const toggle = (m: ModuleId) => {
     if (!canEdit) return
     const on = ws.tenant.enabledModules.includes(m)
+    if (live) return void commit(live.setModules(on ? ws.tenant.enabledModules.filter((x) => x !== m) : [...ws.tenant.enabledModules, m]), `${navItem(m).label} ${on ? 'disabled' : 'enabled'}`)
     update((w) => ({ ...w, tenant: { ...w.tenant, enabledModules: on ? w.tenant.enabledModules.filter((x) => x !== m) : [...w.tenant.enabledModules, m] } }))
     log(on ? 'Module disabled' : 'Module enabled', navItem(m).label, on ? 'warn' : 'nv', 'settings')
   }

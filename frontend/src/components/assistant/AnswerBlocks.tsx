@@ -1,4 +1,5 @@
-import { Ban, Bot, CircleAlert, Clock, Database, FileText, LoaderCircle, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { Ban, Bot, CircleAlert, Clock, Database, FileText, Gavel, LoaderCircle, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react'
+import type { AnswerDiagnostics } from '../../lib/apiContract.ts'
 import type { AnswerView, AskOutcome } from '../../lib/assistant.ts'
 import { cx } from '../../lib/format.ts'
 import type { GateDecision } from '../../lib/guard.ts'
@@ -72,6 +73,7 @@ export function AnswerBody({ view, source, resourceLabel, compact }: { view: Ans
           </ol>
         </div>
       )}
+      {view.diagnostics && <DiagnosticsBlock d={view.diagnostics} />}
       {!compact && (
         <details className="group rounded-md border border-line bg-surface px-3 py-2 text-xs text-muted">
           <summary className="cursor-pointer select-none font-medium text-fg-2">How this answer was filtered</summary>
@@ -96,6 +98,74 @@ export function AnswerBody({ view, source, resourceLabel, compact }: { view: Ans
         </details>
       )}
     </div>
+  )
+}
+
+const cell = (v: unknown) => (v === null || v === undefined ? '—' : typeof v === 'number' ? String(Math.round(v * 100) / 100) : typeof v === 'object' ? JSON.stringify(v) : String(v))
+
+/** Server diagnostics: intent, structured rows (SQL hop), retrieved snippets (RAG hop), verdict and the SQL that ran. */
+export function DiagnosticsBlock({ d }: { d: AnswerDiagnostics }) {
+  const rows = (d.structured_data ?? []).slice(0, 8)
+  const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))].filter((c) => c !== 'table').slice(0, 8)
+  return (
+    <details className="rounded-md border border-line bg-surface px-3 py-2 text-xs text-muted" open={d.intent === 'root_cause'}>
+      <summary className="flex cursor-pointer select-none items-center gap-2 font-medium text-fg-2">
+        Diagnostics
+        {d.intent && <Badge tone="info">{d.intent.replace('_', ' ')}</Badge>}
+      </summary>
+      <div className="mt-2 space-y-2.5">
+        {d.root_cause_verdict && (
+          <p className="flex items-start gap-2 rounded-md border border-accent/50 border-l-4 bg-accent/[0.06] px-3 py-2 text-[13px] text-fg">
+            <Gavel className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
+            <span>
+              <span className="eyebrow mr-1.5 text-accent">Verdict</span>
+              {d.root_cause_verdict}
+            </span>
+          </p>
+        )}
+        {rows.length > 0 && cols.length > 0 && (
+          <div className="overflow-x-auto rounded-sm border border-line">
+            <table className="num w-full text-left text-[11px]">
+              <caption className="sr-only">Structured data used for this answer</caption>
+              <thead>
+                <tr className="border-b border-line bg-deck">
+                  {cols.map((c) => (
+                    <th key={c} scope="col" className="whitespace-nowrap px-2 py-1 font-medium text-muted">
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-b border-line/60 last:border-0">
+                    {cols.map((c) => (
+                      <td key={c} className="whitespace-nowrap px-2 py-1 text-fg-2">
+                        {cell(r[c])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {(d.retrieved_context ?? []).length > 0 && (
+          <ul className="space-y-1.5">
+            {d.retrieved_context!.map((c, i) => (
+              <li key={i} className="rounded-sm border border-line-2 bg-raised px-2 py-1.5">
+                <span className="num mb-1 inline-flex items-center gap-1 rounded-sm border border-info/40 bg-info/10 px-1.5 font-semibold text-info">
+                  <FileText className="size-3" aria-hidden /> {c.source}
+                  {c.page ? ` · p.${c.page}` : ''}
+                </span>
+                <p className="text-fg-2">{c.snippet}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+        {d.sql && <pre className="terminal wrap-anywhere max-h-40 overflow-auto whitespace-pre-wrap p-2 text-[11px]">{d.sql}</pre>}
+      </div>
+    </details>
   )
 }
 

@@ -7,10 +7,18 @@ import { Badge, Button, Meter } from '../ui/primitives.tsx'
 
 type SetDocs = (fn: (d: KbDocument[]) => KbDocument[]) => void
 
+/** Live mode (FastAPI): uploads, ACL patches and deletes go to /api/documents/*; the snapshot then refreshes. */
+export interface DocActions {
+  upload: (files: File[]) => void
+  patch: (id: string, patch: Partial<Pick<KbDocument, 'category' | 'visibility' | 'module'>>) => void
+  remove: (id: string) => void
+}
+
 interface Props {
   docs: KbDocument[]
   setDocs: SetDocs
   readOnly?: boolean
+  actions?: DocActions
 }
 
 export function RagIndicator({ docs, className }: { docs: KbDocument[]; className?: string }) {
@@ -30,6 +38,7 @@ export function RagIndicator({ docs, className }: { docs: KbDocument[]; classNam
 
 /** uploaded → extracted/chunked → ACL tagged → indexed, one segment per stage. */
 export function Lifecycle({ doc }: { doc: KbDocument }) {
+  if (doc.status === 'failed') return <p className="text-xs text-crit-2">Processing failed{doc.error ? ` · ${doc.error}` : ''}</p>
   const at = DOC_STAGES.findIndex((s) => s.id === doc.status)
   return (
     <div>
@@ -46,7 +55,7 @@ export function Lifecycle({ doc }: { doc: KbDocument }) {
   )
 }
 
-export function UploadZone({ setDocs, compact }: { setDocs: SetDocs; compact?: boolean }) {
+export function UploadZone({ setDocs, compact, actions, onFile }: { setDocs: SetDocs; compact?: boolean; actions?: DocActions; onFile?: (docId: string, file: File) => void }) {
   const input = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [rejected, setRejected] = useState<string | null>(null)
@@ -56,7 +65,13 @@ export function UploadZone({ setDocs, compact }: { setDocs: SetDocs; compact?: b
     const list = [...files]
     const pdfs = list.filter((f) => f.name.toLowerCase().endsWith('.pdf'))
     setRejected(pdfs.length < list.length ? `${list.length - pdfs.length} non-PDF file(s) skipped — PDF only.` : null)
-    setDocs((d) => [...d, ...pdfs.map((f) => makeDoc({ name: f.name, sizeKb: Math.max(1, Math.round(f.size / 1024)), category: 'SOP / Procedure', visibility: 'Company' }))])
+    if (actions) return actions.upload(pdfs)
+    const docs = pdfs.map((f) => {
+      const d = makeDoc({ name: f.name, sizeKb: Math.max(1, Math.round(f.size / 1024)), category: 'SOP / Procedure', visibility: 'Company' })
+      onFile?.(d.id, f)
+      return d
+    })
+    setDocs((d) => [...d, ...docs])
   }
   const addDemo = () =>
     setDocs((d) => {
@@ -82,7 +97,9 @@ export function UploadZone({ setDocs, compact }: { setDocs: SetDocs; compact?: b
       <CloudUpload className={cx('size-6 shrink-0', dragging ? 'text-accent' : 'text-muted')} aria-hidden />
       <div className="min-w-[200px] flex-1">
         <p className="text-sm font-medium text-fg">Drop PDFs to add them to the knowledge base</p>
-        <p className="mt-0.5 text-xs text-muted">Demo: files stay in this browser — extraction, ACL tagging and indexing are simulated locally.</p>
+        <p className="mt-0.5 text-xs text-muted">
+          {actions ? 'Uploaded to FastAPI (PDF only, ≤ 20 MB) — extraction, ACL tagging and indexing run server-side.' : 'Demo: files stay in this browser — extraction, ACL tagging and indexing are simulated locally.'}
+        </p>
         {rejected && (
           <p className="mt-1 flex items-center gap-2 text-xs text-warn" role="status">
             {rejected}
@@ -96,17 +113,20 @@ export function UploadZone({ setDocs, compact }: { setDocs: SetDocs; compact?: b
         <Button size="sm" onClick={() => input.current?.click()}>
           Browse PDFs
         </Button>
-        <Button size="sm" icon={Sparkles} onClick={addDemo}>
-          Add demo PDFs
-        </Button>
+        {!actions && (
+          <Button size="sm" icon={Sparkles} onClick={addDemo}>
+            Add demo PDFs
+          </Button>
+        )}
       </div>
       <input ref={input} type="file" accept="application/pdf,.pdf" multiple className="sr-only" tabIndex={-1} aria-label="Choose PDF files" onChange={(e) => addFiles(e.target.files)} />
     </div>
   )
 }
 
-export function DocumentTable({ docs, setDocs, readOnly }: Props) {
-  const update = (id: string, patch: Partial<KbDocument>) => setDocs((d) => d.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+export function DocumentTable({ docs, setDocs, readOnly, actions }: Props) {
+  const update = (id: string, patch: Partial<KbDocument>) => (actions ? actions.patch(id, patch) : setDocs((d) => d.map((x) => (x.id === id ? { ...x, ...patch } : x))))
+  const remove = (id: string) => (actions ? actions.remove(id) : setDocs((all) => all.filter((x) => x.id !== id)))
   if (!docs.length) return null
   return (
     <div className="overflow-x-auto rounded-lg border border-line">
@@ -168,7 +188,7 @@ export function DocumentTable({ docs, setDocs, readOnly }: Props) {
               </td>
               <td className="px-3 py-2 text-right">
                 {!readOnly && (
-                  <button type="button" onClick={() => setDocs((all) => all.filter((x) => x.id !== d.id))} className="grid size-8 place-items-center rounded-md text-muted hover:bg-crit/10 hover:text-crit-2" aria-label={`Remove ${d.name}`}>
+                  <button type="button" onClick={() => remove(d.id)} className="grid size-8 place-items-center rounded-md text-muted hover:bg-crit/10 hover:text-crit-2" aria-label={`Remove ${d.name}`}>
                     <Trash className="size-4" aria-hidden />
                   </button>
                 )}
@@ -182,10 +202,10 @@ export function DocumentTable({ docs, setDocs, readOnly }: Props) {
 }
 
 /** Composite used by the owner setup wizard. */
-export function DocumentsPanel({ docs, setDocs, readOnly }: Props) {
+export function DocumentsPanel({ docs, setDocs, readOnly, onFile }: Props & { onFile?: (docId: string, file: File) => void }) {
   return (
     <div className="space-y-4">
-      {!readOnly && <UploadZone setDocs={setDocs} />}
+      {!readOnly && <UploadZone setDocs={setDocs} onFile={onFile} />}
       <RagIndicator docs={docs} />
       <DocumentTable docs={docs} setDocs={setDocs} readOnly={readOnly} />
       <p className="text-xs text-muted">Document path: upload → extraction & validation → permission-tagged chunks → authorized retrieval. Chunks are not Gold tables — Gold holds curated operational records.</p>
@@ -196,7 +216,7 @@ export function DocumentsPanel({ docs, setDocs, readOnly }: Props) {
 /** Stage counters + per-document progress for the ingestion tab. */
 export function IngestionStatus({ docs }: { docs: KbDocument[] }) {
   const counts = DOC_STAGES.map((s) => ({ ...s, n: docs.filter((d) => d.status === s.id).length }))
-  const active = docs.filter((d) => d.status !== 'indexed')
+  const active = docs.filter((d) => d.status !== 'indexed' && d.status !== 'failed')
   return (
     <div className="space-y-4">
       <ol className="grid grid-cols-2 gap-3 @3xl:grid-cols-4" aria-label="Documents per lifecycle stage">

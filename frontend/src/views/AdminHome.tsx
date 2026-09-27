@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, BookOpen, ChevronRight, CircleX, FileText, Info, LayoutDashboard, Lock, Pause, Play, ShieldAlert, Sparkles, TriangleAlert, Truck, type LucideIcon } from 'lucide-react'
+import { Activity, ArrowRight, BookOpen, ChevronRight, CircleX, FileText, Info, LayoutDashboard, Lock, Pause, Play, ScrollText, ShieldAlert, Sparkles, TriangleAlert, Truck, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { AssistantPanel } from '../components/assistant/AssistantPanel.tsx'
 import { SystemMap } from '../components/map/SystemMap.tsx'
@@ -8,6 +8,7 @@ import { Page, PageHeader } from '../components/ui/PageHeader.tsx'
 import { HEALTH_META } from '../components/ui/health.ts'
 import { Badge, Button, EmptyState, HealthBadge, KpiCard, Panel, StatusDot } from '../components/ui/primitives.tsx'
 import { TabPanel, Tabs, type TabDef } from '../components/ui/Tabs.tsx'
+import { ComplianceTab } from '../components/workspace/Compliance.tsx'
 import { AccessModel, IncidentEvidence, IncidentList } from '../components/workspace/Security.tsx'
 import { navItem, type ViewId } from '../data/nav.ts'
 import { can, isOwnerLike, moduleStage } from '../lib/access.ts'
@@ -18,7 +19,7 @@ import { useActivity, useOpsModel } from '../lib/useOps.ts'
 import type { AuditEvent, SecurityIncident } from '../lib/workspace.ts'
 import { useWorkspace } from '../lib/workspaceContext.ts'
 
-type AdminTab = 'overview' | 'live' | 'briefing' | 'security'
+type AdminTab = 'overview' | 'live' | 'briefing' | 'compliance' | 'security'
 
 const ALERT_ICON: Record<Tone, LucideIcon> = { crit: CircleX, warn: TriangleAlert, info: Info, nv: Info, neutral: Info }
 
@@ -35,6 +36,7 @@ export function AdminHome() {
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'live', label: 'Live Operations', icon: Activity, badge: model.hub.attention || undefined, badgeTone: 'warn', badgeLabel: `${model.hub.attention} modules need attention` },
     { id: 'briefing', label: 'AI Briefing', icon: Sparkles },
+    ...(can(perms, 'dashboard', 'view') ? [{ id: 'compliance' as const, label: 'Compliance', icon: ScrollText }] : []),
     ...(showSecurity
       ? [{ id: 'security' as const, label: 'Security', icon: ShieldAlert, badge: model.kpis.security?.deniedLast24h || undefined, badgeTone: 'crit' as const, badgeLabel: `${model.kpis.security?.deniedLast24h} denied requests in 24 hours` }]
       : []),
@@ -78,6 +80,7 @@ export function AdminHome() {
         )}
         {tab === 'live' && <LiveOperations model={model} onGo={go} />}
         {tab === 'briefing' && <BriefingTab model={model} />}
+        {tab === 'compliance' && <ComplianceTab />}
         {tab === 'security' && showSecurity && <SecurityTab model={model} />}
       </TabPanel>
     </Page>

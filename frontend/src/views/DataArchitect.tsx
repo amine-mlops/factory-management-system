@@ -104,17 +104,24 @@ function useFindings(): Finding[] {
 }
 
 function SourcesTab({ findings }: { findings: Finding[] }) {
-  const { ws, perms, update } = useWorkspace()
+  const { ws, perms, update, live, commit } = useWorkspace()
   const { navigate } = useRoute()
   const [monitor, setMonitor] = useState<Connector | null>(null)
   const [separation, setSeparation] = useState(false)
   const canConfigure = can(perms, 'data', 'configure')
-  const setConnectors = (fn: (c: Connector[]) => Connector[]) => update((w) => ({ ...w, connectors: fn(w.connectors) }))
+  const setConnectors = (fn: (c: Connector[]) => Connector[]) => {
+    if (!live) return update((w) => ({ ...w, connectors: fn(w.connectors) }))
+    // Live: POST /sources/{id}/connect|disconnect for each toggled connector (data:configure, metadata only).
+    for (const c of fn(ws.connectors)) {
+      const cur = ws.connectors.find((x) => x.id === c.id)
+      if (cur && cur.connected !== c.connected) void commit(live.connectSource(c.id, c.connected), `${c.kind} ${c.connected ? 'connected' : 'disconnected'}`)
+    }
+  }
   const dataset = (c: Connector) => (c.id === 'tms' ? ws.gold.find((g) => g.name === 'gold.shipments_eta') : c.id === 's3' ? ws.gold.find((g) => g.name === 'gold.supplier_scorecard') : ws.gold.find((g) => g.sources.includes(c.id)))
   return (
     <div className="grid gap-4 @4xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
       <Panel
-        eyebrow="Mock connectors · credentials stay server-side"
+        eyebrow={live ? 'GET /api/sources · credentials stay server-side' : 'Mock connectors · credentials stay server-side'}
         title="Source connectors"
         actions={
           <Button size="sm" variant="ghost" onClick={() => setSeparation(true)}>

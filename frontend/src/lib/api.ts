@@ -38,8 +38,23 @@ export function setAuthTokenProvider(fn: TokenProvider) {
   tokenProvider = fn
 }
 
+/** sessionStorage key of the FastAPI bearer token (live mode only; mock mode never stores one). */
+export const TOKEN_KEY = 'nexus.token'
+
+export function readToken(): string | null {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+// Live mode: every request carries the token issued by POST /api/auth/login (or demo-login).
+setAuthTokenProvider(readToken)
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  /** JSON-serialisable body, or FormData for multipart uploads. */
   body?: unknown
   timeoutMs?: number
   signal?: AbortSignal
@@ -54,7 +69,8 @@ export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Pr
   opts.signal?.addEventListener('abort', onAbort)
 
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
+  const isForm = typeof FormData !== 'undefined' && opts.body instanceof FormData
+  if (opts.body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
   const token = await tokenProvider()
   if (token) headers.Authorization = `Bearer ${token}`
 
@@ -64,7 +80,7 @@ export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Pr
       res = await (opts.fetchImpl ?? fetch)(`${API_URL}${path}`, {
         method: opts.method ?? (opts.body !== undefined ? 'POST' : 'GET'),
         headers,
-        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+        body: opts.body === undefined ? undefined : isForm ? (opts.body as FormData) : JSON.stringify(opts.body),
         signal: controller.signal,
       })
     } catch (err) {
@@ -102,6 +118,9 @@ export interface HealthResponse {
   status: 'ok' | 'degraded'
   version?: string
   gpu?: string
+  llm?: 'nim' | 'deterministic'
+  rag?: 'tfidf' | 'chroma'
+  db?: string
 }
 
 /** GET /health — used by the connection card. */
@@ -109,37 +128,70 @@ export async function checkHealth(fetchImpl?: typeof fetch): Promise<{ ok: boole
   const t0 = performance.now()
   try {
     const h = await apiRequest<HealthResponse>('/health', { timeoutMs: 3000, fetchImpl })
-    return { ok: h?.status === 'ok', detail: `${h?.status ?? 'unknown'}${h?.version ? ` · ${h.version}` : ''}`, ms: Math.round(performance.now() - t0) }
+    const extra = [h?.version, h?.llm && `LLM ${h.llm}`, h?.rag && `RAG ${h.rag}`].filter(Boolean).join(' · ')
+    return { ok: h?.status === 'ok', detail: `${h?.status ?? 'unknown'}${extra ? ` · ${extra}` : ''}`, ms: Math.round(performance.now() - t0) }
   } catch (err) {
     return { ok: false, detail: describeError(err), ms: Math.round(performance.now() - t0) }
   }
 }
 
 /**
- * Endpoint catalogue expected from FastAPI (see INTEGRATION.md for payloads).
- * Only `/health` and `/triage/infer` are called by this UI today; the rest run
- * on local mock state until the backend exists.
+ * Endpoint catalogue served by FastAPI under VITE_API_URL (e.g. `/api` through the Vite proxy).
+ * See MASTER_SPEC.md §7 for payloads. `{param}` placeholders are filled by `endpoint()`.
+ * Mock mode (VITE_USE_MOCK=true) calls none of these.
  */
 export const ENDPOINTS = {
   health: '/health',
   auth: '/auth/session',
+  authLogin: '/auth/login',
+  authDemoLogin: '/auth/demo-login',
+  authCompany: '/auth/company',
+  workspace: '/workspace',
   workspaces: '/workspaces',
+  workspaceCurrent: '/workspaces/current',
   invites: '/invites',
+  invite: '/invites/{code}',
+  inviteAccept: '/invites/{code}/accept',
   members: '/members',
+  memberRoles: '/members/{id}/roles',
+  accessRequests: '/access-requests',
   roleGrants: '/roles/grants',
   modules: '/modules',
   documentsUpload: '/documents/upload',
   documentsStatus: '/documents/status',
+  document: '/documents/{id}',
   ragQuery: '/rag/query',
+  chat: '/chat',
   sources: '/sources',
+  sourceConnect: '/sources/{id}/connect',
+  sourceDisconnect: '/sources/{id}/disconnect',
   pipelines: '/pipelines',
   shipments: '/shipments',
+  shipmentStatus: '/shipments/{id}/status',
+  shipmentAssignment: '/shipments/{id}/assignment',
+  suppliers: '/procurement/suppliers',
+  quotations: '/procurement/quotations',
+  quotationAward: '/procurement/quotations/{id}/award',
   inventory: '/inventory',
   triageInfer: '/triage/infer',
   securityEvents: '/audit/security-events',
+  auditEvents: '/audit/events',
+  auditRules: '/audit/rules',
+  auditRule: '/audit/rules/{id}',
+  auditCompile: '/audit/rules/compile',
+  auditRun: '/audit/run',
+  auditRuns: '/audit/runs',
   expiryLots: '/inventory/expiry/lots',
   expiryActions: '/inventory/expiry/actions',
   expiryDecision: '/inventory/expiry/actions/{id}/decision',
   expiryRules: '/inventory/expiry/rules',
   expiryRuns: '/inventory/expiry/runs',
+  expiryScan: '/inventory/expiry/scan',
 } as const
+
+export type EndpointKey = keyof typeof ENDPOINTS
+
+/** Fills `{param}` placeholders (URI-encoded). */
+export function endpoint(key: EndpointKey, params: Record<string, string> = {}): string {
+  return ENDPOINTS[key].replace(/\{(\w+)\}/g, (_, k: string) => encodeURIComponent(params[k] ?? ''))
+}

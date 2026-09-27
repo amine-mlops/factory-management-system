@@ -23,11 +23,13 @@ const RATING_TONE: Record<Supplier['rating'], Tone> = { Preferred: 'nv', Approve
 
 /** Everything the procurement tabs share: RFQs, best-value flags, citation status and the guarded award action. */
 function useProcurement() {
-  const { ws, perms, update, log, me } = useWorkspace()
+  const { ws, perms, update, log, me, live, commit } = useWorkspace()
   const notify = useNotify()
   const returns = supplierReturnsFor(ws.expiry, perms, new Date())
   const decideReturn = (r: SupplierReturnView, status: 'approved' | 'dismissed' | 'proposed') => {
     if (!canDecide(perms, r.action)) return
+    const verbLive = status === 'approved' ? 'approved — hand-off queued (simulated)' : status === 'dismissed' ? 'dismissed' : 'reopened'
+    if (live) return void commit(live.decideExpiryAction(r.action.id, status), `${r.action.id} ${verbLive}`)
     update((w) => ({ ...w, expiry: decideAction(w.expiry, r.action.id, status, me.email.split('@')[0] || me.name, new Date()) }))
     const verb = status === 'approved' ? 'approved' : status === 'dismissed' ? 'dismissed' : 'reopened'
     log(`Supplier return ${verb}`, `${r.action.id} · ${r.action.title}${status === 'approved' ? ' · supplier hand-off queued (simulated — nothing sent)' : ''}`, status === 'approved' ? 'nv' : 'info', 'procurement')
@@ -39,6 +41,7 @@ function useProcurement() {
   const sup = (id: string) => ws.suppliers.find((s) => s.id === id)
   const award = (q: Quotation) => {
     if (!manage) return
+    if (live) return void commit(live.awardQuotation(q.id), `Awarded ${q.id} · purchase-order draft created`)
     update((w) => ({ ...w, quotations: w.quotations.map((x) => (x.rfq === q.rfq && x.item === q.item ? { ...x, status: x.id === q.id ? 'Awarded' : 'Received' } : x)) }))
     log('Quotation awarded', `${q.id} (${sup(q.supplierId)?.name}) for ${q.rfq} — PO draft created (demo)`, 'nv', 'procurement')
     notify(`Awarded ${q.id} · purchase-order draft created (demo)`, 'nv')

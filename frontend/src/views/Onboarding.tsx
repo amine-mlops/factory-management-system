@@ -7,7 +7,9 @@ import { Logo } from '../components/ui/Logo.tsx'
 import { Badge, Button, Eyebrow } from '../components/ui/primitives.tsx'
 import { MODULE_NAV, navItem, type ModuleId } from '../data/nav.ts'
 import { moduleStage, STAGE_LABEL, type Member, type RoleId } from '../lib/access.ts'
+import { describeError } from '../lib/api.ts'
 import { cx } from '../lib/format.ts'
+import { live } from '../lib/live.ts'
 import { useDocProcessor } from '../lib/useDocProcessor.ts'
 import { connect, emptyDraft, generateInvite, ownerMember, ragState, workspaceFromDraft, type Connector, type GoldDataset, type KbDocument, type SetupDraft, type Workspace } from '../lib/workspace.ts'
 import type { Session } from './Login.tsx'
@@ -43,6 +45,8 @@ export function Onboarding({ session, onLaunch, onCancel }: { session: Session; 
     return d
   })
   const [locInput, setLocInput] = useState('')
+  const [launching, setLaunching] = useState(false)
+  const [launchError, setLaunchError] = useState<string | null>(null)
 
   const setDocs = useCallback((fn: (d: KbDocument[]) => KbDocument[]) => setDraft((x) => ({ ...x, documents: fn(x.documents) })), [])
   const setConnectors = useCallback((fn: (c: Connector[]) => Connector[]) => setDraft((x) => ({ ...x, connectors: fn(x.connectors) })), [])
@@ -57,6 +61,27 @@ export function Onboarding({ session, onLaunch, onCancel }: { session: Session; 
   const blocker = step === 0 && !t.name.trim() ? 'Company name is required.' : step === 1 && t.enabledModules.length === 0 ? 'Select at least one module.' : null
   const owner = ownerMember(session.name, session.email)
   const previewTenant = { ...t, tenantId: 'tnt_draft' as const }
+
+  /** Live: POST /workspaces → PUT /modules → upload each picked PDF → POST /invites, then open the fresh snapshot. */
+  const launch = async () => {
+    if (!live) return onLaunch(workspaceFromDraft(draft, owner))
+    setLaunching(true)
+    setLaunchError(null)
+    try {
+      const tenant = { name: t.name.trim(), industry: t.industry, size: t.size, locations: t.locations, context: t.context, enabledModules: t.enabledModules }
+      await live.createCompany(tenant)
+      await live.setModules(t.enabledModules)
+      for (const d of draft.documents) {
+        const file = live.stashedFile(d.id)
+        if (file) await live.uploadDocument(file, { category: d.category, visibility: d.visibility, module: d.module ?? null }, false)
+      }
+      for (const inv of draft.invites) await live.createInvite(inv.roles)
+      onLaunch(await live.snapshot())
+    } catch (err) {
+      setLaunchError(`Launch failed — ${describeError(err)}`)
+      setLaunching(false)
+    }
+  }
 
   const addLocation = () => {
     const v = locInput.trim()
@@ -211,7 +236,7 @@ export function Onboarding({ session, onLaunch, onCancel }: { session: Session; 
               </div>
             )}
 
-            {step === 2 && <DocumentsPanel docs={draft.documents} setDocs={setDocs} />}
+            {step === 2 && <DocumentsPanel docs={draft.documents} setDocs={setDocs} onFile={live?.stashFile} />}
 
             {step === 3 && (
               <div>
@@ -247,9 +272,9 @@ export function Onboarding({ session, onLaunch, onCancel }: { session: Session; 
             <Button icon={ArrowLeft} onClick={() => (step === 0 ? onCancel() : setStep((s) => s - 1))}>
               {step === 0 ? 'Cancel' : 'Back'}
             </Button>
-            {blocker && (
+            {(blocker ?? launchError) && (
               <p className="flex items-center gap-1.5 text-[13px] text-warn" role="status">
-                <CircleAlert className="size-3.5" aria-hidden /> {blocker}
+                <CircleAlert className="size-3.5" aria-hidden /> {blocker ?? launchError}
               </p>
             )}
             {step < STEPS.length - 1 ? (
@@ -257,8 +282,8 @@ export function Onboarding({ session, onLaunch, onCancel }: { session: Session; 
                 Next
               </Button>
             ) : (
-              <Button variant="primary" icon={Rocket} onClick={() => onLaunch(workspaceFromDraft(draft, owner))}>
-                Launch workspace
+              <Button variant="primary" icon={Rocket} disabled={launching} onClick={() => void launch()}>
+                {launching ? 'Launching…' : 'Launch workspace'}
               </Button>
             )}
           </footer>

@@ -1,7 +1,18 @@
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
 .env
 .DS_Store
 backend/data/*.pdf
 backend/data/*.csv
+# runtime state
+demo/uploads/
+demo/*.duckdb.wal
+demo/rules.json.tmp
+# frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+.vite/
+frontend/.vite/

@@ -1,15 +1,17 @@
-import { Eye, X } from 'lucide-react'
+import { Eye, Siren, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { MODULES } from '../../data/modules.ts'
 import { isModuleId, navItem, type ViewId } from '../../data/nav.ts'
-import { USE_MOCK_DEFAULT } from '../../lib/api.ts'
-import { effectivePermissions, IMPLEMENTED_MODULES, isOwnerLike, landingPage, roleDef, type Member, type RoleId, type UserId } from '../../lib/access.ts'
+import { describeError, USE_MOCK_DEFAULT } from '../../lib/api.ts'
+import type { AuditRun, DemoPersona } from '../../lib/apiContract.ts'
+import { can, effectivePermissions, IMPLEMENTED_MODULES, isOwnerLike, landingPage, roleDef, type Member, type RoleId, type UserId } from '../../lib/access.ts'
 import { scanDue, withScan } from '../../lib/expiry.ts'
 import type { Tone } from '../../lib/format.ts'
 import { hashFor, parseHash, RouteContext, type RouteCtx } from '../../lib/route.ts'
 import { ToastContext, type ToastItem } from '../../lib/toast.ts'
 import type { PresetId } from '../../lib/types.ts'
 import { useDocProcessor } from '../../lib/useDocProcessor.ts'
+import { live } from '../../lib/live.ts'
 import { useMediaQuery } from '../../lib/useNow.ts'
 import { useTriage } from '../../lib/useTriage.ts'
 import { auditEvent, type KbDocument, type SecurityIncident, type Workspace } from '../../lib/workspace.ts'
@@ -49,6 +51,7 @@ export interface Persona {
 }
 
 const DOCK_KEY = 'nexus.dock.open'
+const NO_DOCS: KbDocument[] = []
 /** Open by default only where docking still leaves a two-column page (≥1600 px); remembered per viewer afterwards. */
 const readDock = () => {
   try {
@@ -64,11 +67,22 @@ interface Props {
   session: Session
   ws: Workspace
   setWs: (fn: (w: Workspace) => Workspace) => void
+  /** Swaps in a workspace for a different identity (live "View as" re-login). */
+  replaceWs: (w: Workspace) => void
   onLogout: () => void
   onSwitchCompany: () => void
 }
 
-export function Shell({ session, ws, setWs, onLogout, onSwitchCompany }: Props) {
+/** Live-mode demo personas (POST /api/auth/demo-login) — seeded users, so the backend authorizes each for real. */
+const LIVE_PERSONAS: Array<Persona & { persona: DemoPersona }> = [
+  { key: 'owner', persona: 'owner', label: 'Owner', sub: 'Alex Moreno · demo owner', userId: 'usr_owner', roles: null },
+  { key: 'driver', persona: 'driver', label: 'Driver', sub: 'Jordan Lee', userId: 'usr_jlee', roles: null },
+  { key: 'procurement', persona: 'procurement', label: 'Procurement', sub: 'Tess Vos', userId: 'usr_tvos', roles: null },
+  { key: 'architect', persona: 'data_architect', label: 'Data Architect', sub: 'Priya Shah · technical view', userId: 'usr_pshah', roles: null },
+]
+const POLL_MS = 15_000
+
+export function Shell({ session, ws, setWs, replaceWs, onLogout, onSwitchCompany }: Props) {
   const [useMock, setUseMock] = useState(USE_MOCK_DEFAULT)
   const triage = useTriage(useMock, setUseMock)
   const [navOpen, setNavOpen] = useState(false)
@@ -138,34 +152,83 @@ export function Shell({ session, ws, setWs, onLogout, onSwitchCompany }: Props) 
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200)
   }, [])
 
+  /* ---------------- live mode: the server snapshot is the source of truth */
+  const [auditRun, setAuditRun] = useState<AuditRun | null>(null)
+  const canSeeAudit = can(perms, 'dashboard', 'view')
+  const refresh = useCallback(async () => {
+    if (!live) return
+    const [snap, run] = await Promise.all([live.snapshot(), canSeeAudit ? live.latestAuditRun().catch(() => null) : Promise.resolve(null)])
+    setWs(() => snap)
+    setAuditRun(run)
+  }, [setWs, canSeeAudit])
+  useEffect(() => {
+    if (!live) return
+    // Polling lets incidents and approvals made by other personas appear without a reload.
+    const tick = () => void refresh().catch(() => undefined)
+    const first = setTimeout(tick, 0)
+    const id = setInterval(tick, POLL_MS)
+    return () => {
+      clearTimeout(first)
+      clearInterval(id)
+    }
+  }, [refresh])
+
+  const commit = useCallback(
+    async (call: Promise<Workspace | null>, success?: string) => {
+      try {
+        const snap = await call
+        if (snap) setWs(() => snap)
+        if (success) notify(success)
+        if (live && canSeeAudit) live.latestAuditRun().then(setAuditRun, () => undefined)
+        return true
+      } catch (err) {
+        notify(describeError(err), 'crit')
+        return false
+      }
+    },
+    [setWs, notify, canSeeAudit],
+  )
+
   const actorName = acting.email.split('@')[0] || acting.name
+  // Live mode: the backend writes the audit trail for every mutation, so local events would only duplicate it.
   const log = useCallback(
-    (action: string, detail: string, tone: Tone = 'info', resource?: ViewId) => setWs((w) => ({ ...w, audit: [auditEvent(actorName, action, detail, tone, resource), ...w.audit].slice(0, 60) })),
+    (action: string, detail: string, tone: Tone = 'info', resource?: ViewId) => {
+      if (live) return
+      setWs((w) => ({ ...w, audit: [auditEvent(actorName, action, detail, tone, resource), ...w.audit].slice(0, 60) }))
+    },
     [setWs, actorName],
   )
   const recordIncident = useCallback(
-    (i: SecurityIncident) =>
+    (i: SecurityIncident) => {
+      if (live) {
+        // Already written server-side (403 from /rag/query or POST /audit/security-events) — just re-sync.
+        void refresh().catch(() => undefined)
+        return
+      }
       setWs((w) => ({
         ...w,
         incidents: [i, ...w.incidents].slice(0, 50),
         audit: [auditEvent(actorName, 'Access denied (403)', `${i.requestedResource} · ${i.stage} · 0 chunks`, 'crit', 'data'), ...w.audit].slice(0, 60),
-      })),
-    [setWs, actorName],
+      }))
+    },
+    [setWs, actorName, refresh],
   )
 
-  // Simulated document processing continues across pages.
+  // Simulated document processing continues across pages (mock mode only — FastAPI processes uploads in live mode).
   const setDocs = useCallback((fn: (d: KbDocument[]) => KbDocument[]) => setWs((w) => ({ ...w, documents: fn(w.documents) })), [setWs])
-  useDocProcessor(ws.documents, setDocs)
+  useDocProcessor(live ? NO_DOCS : ws.documents, setDocs)
 
   // Simulated Expiry Guard schedule: runs a scan whenever the cadence has elapsed (catches up once after a gap).
+  // Live mode: the backend scheduler runs scans and audits.
   useEffect(() => {
+    if (live) return
     const tick = () => setWs((w) => (w.tenant.enabledModules.includes('inventory') && scanDue(w.expiry, new Date()) ? withScan(w, new Date(), 'schedule') : w))
     tick()
     const id = setInterval(tick, 20_000)
     return () => clearInterval(id)
   }, [setWs])
 
-  const ctx: WorkspaceCtx = { ws, update: setWs, me: acting, actingUserId: acting.userId, realOwner, perms, log, recordIncident, useMock, setUseMock }
+  const ctx: WorkspaceCtx = { ws, update: setWs, me: acting, actingUserId: acting.userId, realOwner, perms, log, recordIncident, useMock, setUseMock, live, commit }
 
   /* ---------------- persona preview (owner-only UX) */
   const personas = useMemo<Persona[]>(() => {
@@ -180,9 +243,25 @@ export function Shell({ session, ws, setWs, onLogout, onSwitchCompany }: Props) 
       { key: 'architect', label: 'Data Architect', sub: arch ? `${arch.name} · technical view` : 'technical view', userId: arch?.userId ?? null, roles: arch ? null : ['data_architect'] },
     ]
   }, [ws.members, realMe.userId, realMe.name])
-  const activePersona = !ws.previewUserId && !ws.previewRoles ? 'owner' : (personas.find((p) => (p.userId && p.userId === ws.previewUserId) || (!p.userId && p.roles && ws.previewRoles?.join() === p.roles.join()))?.key ?? 'custom')
+  const livePersona = live ? (LIVE_PERSONAS.find((p) => p.persona === live!.currentPersona())?.key ?? 'owner') : null
+  const activePersona = livePersona ?? (!ws.previewUserId && !ws.previewRoles ? 'owner' : (personas.find((p) => (p.userId && p.userId === ws.previewUserId) || (!p.userId && p.roles && ws.previewRoles?.join() === p.roles.join()))?.key ?? 'custom'))
+  const showPersonas = live ? live.canSwitchPersona() : realOwner
 
   const setPersona = (p: Persona) => {
+    if (live) {
+      // Real re-login as a seeded persona: the backend authorizes every request for that user.
+      const target = LIVE_PERSONAS.find((x) => x.key === p.key)
+      if (!target) return
+      live
+        .demoLogin(target.persona)
+        .then(() => live!.snapshot())
+        .then((snap) => {
+          notify(`Signed in as ${target.label} (${target.sub.split(' · ')[0]})`, 'info')
+          replaceWs(snap)
+        })
+        .catch((err) => notify(describeError(err), 'crit'))
+      return
+    }
     const next = { ...ws, previewUserId: p.userId, previewRoles: p.userId ? null : p.roles }
     setWs(() => next)
     if (p.key !== 'owner') log('Preview as role', `${realMe.name} previewing ${p.label} (UX only — backend authorizes real sessions)`, 'info', 'team')
@@ -222,6 +301,8 @@ export function Shell({ session, ws, setWs, onLogout, onSwitchCompany }: Props) 
   }
 
   const actions: NavActions = { navigate, openTriage }
+  // Global anomaly banner: CRITICAL violations from the latest operational audit the caller may see.
+  const critical = canSeeAudit ? (auditRun?.violations ?? []).filter((v) => v.severity === 'CRITICAL') : []
   const allowed = perms.pages.has(view)
   const docked = wide && dockOpen
 
@@ -241,6 +322,8 @@ export function Shell({ session, ws, setWs, onLogout, onSwitchCompany }: Props) 
   }
 
   const mainStyle: CSSProperties | undefined = docked ? { paddingRight: 'calc(var(--dock-width) + 2 * var(--dock-gap))' } : undefined
+  // Full-width banners under the header keep their actions clear of the docked assistant.
+  const bannerStyle: CSSProperties = { zIndex: 'var(--z-sidebar)', ...(docked ? { paddingRight: 'calc(var(--dock-width) + 2 * var(--dock-gap))' } : {}) }
 
   return (
     <WorkspaceContext.Provider value={ctx}>
@@ -267,12 +350,35 @@ export function Shell({ session, ws, setWs, onLogout, onSwitchCompany }: Props) 
             navOpen={navOpen}
             useMock={useMock}
             onNavigate={navigate}
-            personas={realOwner ? personas : null}
+            personas={showPersonas ? (live ? LIVE_PERSONAS : personas) : null}
             activePersona={activePersona}
             onPersona={setPersona}
           />
-          {activePersona !== 'owner' && realOwner && (
-            <div className="sticky top-[var(--header-h)] flex items-center gap-3 border-b border-info/40 bg-overlay px-4 py-2" style={{ zIndex: 'var(--z-sidebar)' }} role="status">
+          {live && activePersona !== 'owner' && showPersonas && (
+            <div className="sticky top-[var(--header-h)] flex items-center gap-3 border-b border-info/40 bg-overlay px-4 py-2" style={bannerStyle} role="status">
+              <Eye className="size-4 shrink-0 text-info" aria-hidden />
+              <p className="min-w-0 flex-1 text-[13px] text-fg-2">
+                Signed in as demo persona <span className="font-semibold text-fg">{acting.name}</span> · {perms.roles.map((r) => roleDef(r).label).join(' + ')} — FastAPI authorizes every request for this identity.
+              </p>
+              <button type="button" onClick={() => setPersona(LIVE_PERSONAS[0])} className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-info/50 px-2.5 text-xs font-semibold text-info hover:bg-info/10">
+                <X className="size-3.5" aria-hidden /> Back to Owner
+              </button>
+            </div>
+          )}
+          {critical.length > 0 && (
+            <div role="alert" className="sticky top-[var(--header-h)] border-b border-crit-line bg-crit-bg" style={bannerStyle}>
+            <a href="#/dashboard/compliance" className="flex items-center gap-2.5 px-4 py-1.5 text-[13px] text-fg-2 hover:text-fg">
+              <Siren className="size-4 shrink-0 text-crit-2" aria-hidden />
+              <span className="font-mono text-xs font-bold uppercase tracking-[0.08em] text-crit-2">Critical</span>
+              <span className="min-w-0 flex-1 truncate">
+                {critical.map((v) => `${v.rule_id} ${v.label} — ${v.affected_records.map((r) => r.batch_id ?? r.shipment_id).filter(Boolean).slice(0, 3).join(', ')}`).join(' · ')}
+              </span>
+              <span className="shrink-0 text-xs text-muted">Open compliance →</span>
+            </a>
+            </div>
+          )}
+          {!live && activePersona !== 'owner' && realOwner && (
+            <div className="sticky top-[var(--header-h)] flex items-center gap-3 border-b border-info/40 bg-overlay px-4 py-2" style={bannerStyle} role="status">
               <Eye className="size-4 shrink-0 text-info" aria-hidden />
               <p className="min-w-0 flex-1 text-[13px] text-fg-2">
                 Previewing as <span className="font-semibold text-fg">{acting.name}</span> · {perms.roles.map((r) => roleDef(r).label).join(' + ')} — navigation, data and the assistant reflect this persona. UX preview only; FastAPI authorizes real sessions.

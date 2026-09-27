@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react'
 import type { ViewId } from '../data/nav.ts'
 import type { EffectivePermissions, Member, UserId } from './access.ts'
 import type { Tone } from './format.ts'
+import type { LiveApi } from './live.ts'
 import type { SecurityIncident, Workspace } from './workspace.ts'
 
 export interface WorkspaceCtx {
@@ -19,6 +20,13 @@ export interface WorkspaceCtx {
   setUseMock: (v: boolean) => void
   /** Appends a mock audit event (Team & Access → Audit; role-filtered activity feeds via `resource`). */
   log: (action: string, detail: string, tone?: Tone, resource?: ViewId) => void
+  /** Live-mode FastAPI client (VITE_USE_MOCK=false); null in mock mode, where the local reducers run instead. */
+  live: LiveApi | null
+  /**
+   * Applies a live mutation: awaits the fresh snapshot it resolves to and replaces the workspace.
+   * Errors surface as a toast; resolves false on failure. (403s are also logged server-side.)
+   */
+  commit: (call: Promise<Workspace | null>, success?: string) => Promise<boolean>
 }
 
 export const WorkspaceContext = createContext<WorkspaceCtx | null>(null)
