@@ -59,16 +59,16 @@ agent.py Orchestrator (intent routing, multi-hop synthesis)
 
 | Owner (Discord) | Scope |
 |---|---|
-| **a56lp28sh58ck** | Data engineering: `demo/seed.py` (golden dataset), `backend/sql_engine.py` (DuckDB, PRAGMA recon, Text-to-SQL), synthetic data |
+| **a56lp28sh58ck** | Data engineering + backend scaffold: `demo/seed.py` (golden dataset), `backend/sql_engine.py` (DuckDB, PRAGMA recon, Text-to-SQL), `backend/main.py` + `schemas.py` + `permissions.py` (FastAPI, RBAC), synthetic data |
 | **khalid_is_somewhere** | Frontend: React 18+ SPA (Vite + Tailwind) |
 | **drifter_0** | `backend/rag_engine.py`: PDF ingest, chunking, role-scoped metadata filters |
 | **amineelbaydaouy** + **the_one_and_only_otter** | Agentic capabilities: `backend/agent.py` orchestrator, intent→rule compiler (`demo/rules.json`), `/api/audit/run` evaluator, cronjob monitoring, multi-hop root-cause reasoning |
 
 ```
 ├── backend/
-│   ├── main.py            # FastAPI entry, CORS, /chat & /audit routes  [amineelbaydaouy + the_one_and_only_otter]
-│   ├── schemas.py         # Pydantic request/response models  [same]
-│   ├── permissions.py     # RBAC rules & role-based filters  [UNOWNED — assign!]
+│   ├── main.py            # FastAPI entry, CORS, /chat & /audit routes  [a56lp28sh58ck]
+│   ├── schemas.py         # Pydantic request/response models  [a56lp28sh58ck]
+│   ├── permissions.py     # RBAC rules & role-based filters  [a56lp28sh58ck]
 │   ├── sql_engine.py      # DuckDB client, PRAGMA recon, SQL generator  [a56lp28sh58ck]
 │   ├── rag_engine.py      # Vector store, PDF chunking, metadata filters  [drifter_0]
 │   └── agent.py           # Central agent, tool routing, causal reasoning  [amineelbaydaouy + the_one_and_only_otter]
@@ -155,7 +155,7 @@ Response:
 
 ## 8. Delivery Sequence
 
-**[Hour 0–1] Seed & Gateway Init** — a56lp28sh58ck: seed.py → supply_chain.duckdb · amineelbaydaouy+the_one_and_only_otter: scaffold FastAPI/CORS/schemas/permissions · khalid_is_somewhere: scaffold React+Vite + proxy
+**[Hour 0–1] Seed & Gateway Init** — a56lp28sh58ck: seed.py → supply_chain.duckdb + scaffold FastAPI/CORS/schemas/permissions · khalid_is_somewhere: scaffold React+Vite + proxy
 
 **[Hour 1–3] Subsystems** — amineelbaydaouy+the_one_and_only_otter: /chat & /audit/run + rules.json · khalid_is_somewhere: persona dropdown, chat feed, diagnostic drawer, alert bar · a56lp28sh58ck: PRAGMA recon + Text-to-SQL · drifter_0: PDF ingest + role-scoped filters · amineelbaydaouy+the_one_and_only_otter: agent.py dual-hop fusion
 
